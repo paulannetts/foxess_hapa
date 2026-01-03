@@ -10,12 +10,12 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
+from homeassistant.const import Platform
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import HaTest01ApiClient
-from .const import DOMAIN, LOGGER
+from .const import CONF_API_KEY, CONF_DEVICE_ID, DOMAIN, LOGGER
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import HaTest01Data
 
@@ -45,8 +45,8 @@ async def async_setup_entry(
     )
     entry.runtime_data = HaTest01Data(
         client=HaTest01ApiClient(
-            username=entry.data[CONF_USERNAME],
-            password=entry.data[CONF_PASSWORD],
+            device_id=entry.data[CONF_DEVICE_ID],
+            api_key=entry.data[CONF_API_KEY],
             session=async_get_clientsession(hass),
         ),
         integration=async_get_loaded_integration(hass, entry.domain),

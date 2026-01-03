@@ -4,13 +4,13 @@
             "user": {
                 "description": "See integration_blueprint docs?",
                 "data": {
-                    "username": "Username",
-                    "password": "Password"
+                    "device_id": "Device ID",
+                    "api_key": "API Key"
                 }
             }
         },
         "error": {
-            "auth": "Username/Password is wrong.",
+            "auth": "Device ID/API Key is wrong.",
             "connection": "Unable to connect to the server.",
             "unknown": "Unknown error occurred."
         },
