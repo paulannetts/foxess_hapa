@@ -7,5 +7,5 @@ LOGGER: Logger = getLogger(__package__)
 DOMAIN = "ha_test01"
 ATTRIBUTION = "Data provided by http://jsonplaceholder.typicode.com/"
 
-CONF_DEVICE_ID = "device_id"
+CONF_DEVICE_SERIAL_NUMBER = "device_serial_number"
 CONF_API_KEY = "api_key"

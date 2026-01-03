@@ -14,7 +14,7 @@ from .api import (
     HaTest01ApiClientCommunicationError,
     HaTest01ApiClientError,
 )
-from .const import CONF_API_KEY, CONF_DEVICE_ID, DOMAIN, LOGGER
+from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
 
 
 class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -31,7 +31,7 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 await self._test_credentials(
-                    device_id=user_input[CONF_DEVICE_ID],
+                    device_serial_number=user_input[CONF_DEVICE_SERIAL_NUMBER],
                     api_key=user_input[CONF_API_KEY],
                 )
             except HaTest01ApiClientAuthenticationError as exception:
@@ -48,11 +48,11 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     ## Do NOT use this in production code
                     ## The unique_id should never be something that can change
                     ## https://developers.home-assistant.io/docs/config_entries_config_flow_handler#unique-ids
-                    unique_id=slugify(user_input[CONF_DEVICE_ID])
+                    unique_id=slugify(user_input[CONF_DEVICE_SERIAL_NUMBER])
                 )
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=user_input[CONF_DEVICE_ID],
+                    title=user_input[CONF_DEVICE_SERIAL_NUMBER],
                     data=user_input,
                 )
 
@@ -61,8 +61,10 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_DEVICE_ID,
-                        default=(user_input or {}).get(CONF_DEVICE_ID, vol.UNDEFINED),
+                        CONF_DEVICE_SERIAL_NUMBER,
+                        default=(user_input or {}).get(
+                            CONF_DEVICE_SERIAL_NUMBER, vol.UNDEFINED
+                        ),
                     ): selector.TextSelector(
                         selector.TextSelectorConfig(
                             type=selector.TextSelectorType.TEXT,
@@ -78,10 +80,10 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=_errors,
         )
 
-    async def _test_credentials(self, device_id: str, api_key: str) -> None:
+    async def _test_credentials(self, device_serial_number: str, api_key: str) -> None:
         """Validate credentials."""
         client = HaTest01ApiClient(
-            device_id=device_id,
+            device_serial_number=device_serial_number,
             api_key=api_key,
             session=async_create_clientsession(self.hass),
         )

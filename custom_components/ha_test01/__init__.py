@@ -15,7 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import HaTest01ApiClient
-from .const import CONF_API_KEY, CONF_DEVICE_ID, DOMAIN, LOGGER
+from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
 from .coordinator import BlueprintDataUpdateCoordinator
 from .data import HaTest01Data
 
@@ -45,7 +45,7 @@ async def async_setup_entry(
     )
     entry.runtime_data = HaTest01Data(
         client=HaTest01ApiClient(
-            device_id=entry.data[CONF_DEVICE_ID],
+            device_serial_number=entry.data[CONF_DEVICE_SERIAL_NUMBER],
             api_key=entry.data[CONF_API_KEY],
             session=async_get_clientsession(hass),
         ),

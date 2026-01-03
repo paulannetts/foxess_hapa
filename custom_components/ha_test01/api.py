@@ -40,12 +40,12 @@ class HaTest01ApiClient:
 
     def __init__(
         self,
-        device_id: str,
+        device_serial_number: str,
         api_key: str,
         session: aiohttp.ClientSession,
     ) -> None:
         """Sample API Client."""
-        self._device_id = device_id
+        self._device_serial_number = device_serial_number
         self._api_key = api_key
         self._session = session
 

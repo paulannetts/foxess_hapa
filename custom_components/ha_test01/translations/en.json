@@ -2,15 +2,15 @@
     "config": {
         "step": {
             "user": {
-                "description": "See integration_blueprint docs?",
+                "description": "See https://github.com/macxq/foxess-ha for description of device SN and API KEY",
                 "data": {
-                    "device_id": "Device ID",
+                    "device_serial_number": "Device Serial Number",
                     "api_key": "API Key"
                 }
             }
         },
         "error": {
-            "auth": "Device ID/API Key is wrong.",
+            "auth": "Device SN/API Key is wrong.",
             "connection": "Unable to connect to the server.",
             "unknown": "Unknown error occurred."
         },
