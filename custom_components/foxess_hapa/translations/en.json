@@ -2,7 +2,7 @@
     "config": {
         "step": {
             "user": {
-                "description": "See https://github.com/macxq/foxess-ha for description of device SN and API KEY",
+                "description": "Enter your FoxESS Cloud API key and device serial number. Get your API key from foxesscloud.com > User Profile > API Management.",
                 "data": {
                     "device_serial_number": "Device Serial Number",
                     "api_key": "API Key"

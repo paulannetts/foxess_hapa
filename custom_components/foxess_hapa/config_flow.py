@@ -1,4 +1,4 @@
-"""Adds config flow for Blueprint."""
+"""Config flow for FoxESS HAPA."""
 
 from __future__ import annotations
 
@@ -6,19 +6,19 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from slugify import slugify
 
 from .api import (
-    HaTest01ApiClient,
-    HaTest01ApiClientAuthenticationError,
-    HaTest01ApiClientCommunicationError,
-    HaTest01ApiClientError,
+    FoxessDeviceInfo,
+    FoxessHapaApiClient,
+    FoxessHapaApiClientAuthenticationError,
+    FoxessHapaApiClientCommunicationError,
+    FoxessHapaApiClientError,
 )
 from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
 
 
-class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """Config flow for Blueprint."""
+class FoxessHapaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+    """Config flow for FoxESS HAPA."""
 
     VERSION = 1
 
@@ -30,29 +30,30 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         _errors = {}
         if user_input is not None:
             try:
-                await self._test_credentials(
+                device_info = await self._test_credentials(
                     device_serial_number=user_input[CONF_DEVICE_SERIAL_NUMBER],
                     api_key=user_input[CONF_API_KEY],
                 )
-            except HaTest01ApiClientAuthenticationError as exception:
+            except FoxessHapaApiClientAuthenticationError as exception:
                 LOGGER.warning(exception)
                 _errors["base"] = "auth"
-            except HaTest01ApiClientCommunicationError as exception:
+            except FoxessHapaApiClientCommunicationError as exception:
                 LOGGER.error(exception)
                 _errors["base"] = "connection"
-            except HaTest01ApiClientError as exception:
+            except FoxessHapaApiClientError as exception:
                 LOGGER.exception(exception)
                 _errors["base"] = "unknown"
             else:
-                await self.async_set_unique_id(
-                    ## Do NOT use this in production code
-                    ## The unique_id should never be something that can change
-                    ## https://developers.home-assistant.io/docs/config_entries_config_flow_handler#unique-ids
-                    unique_id=slugify(user_input[CONF_DEVICE_SERIAL_NUMBER])
-                )
+                # Use device serial number as unique ID
+                await self.async_set_unique_id(device_info.device_sn)
                 self._abort_if_unique_id_configured()
+
+                # Use station name as title if available
+                title = (
+                    device_info.station_name or user_input[CONF_DEVICE_SERIAL_NUMBER]
+                )
                 return self.async_create_entry(
-                    title=user_input[CONF_DEVICE_SERIAL_NUMBER],
+                    title=title,
                     data=user_input,
                 )
 
@@ -80,11 +81,13 @@ class HaTest01FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=_errors,
         )
 
-    async def _test_credentials(self, device_serial_number: str, api_key: str) -> None:
-        """Validate credentials."""
-        client = HaTest01ApiClient(
+    async def _test_credentials(
+        self, device_serial_number: str, api_key: str
+    ) -> FoxessDeviceInfo:
+        """Validate credentials by fetching device info."""
+        client = FoxessHapaApiClient(
             device_serial_number=device_serial_number,
             api_key=api_key,
             session=async_create_clientsession(self.hass),
         )
-        await client.async_get_data()
+        return await client.async_get_device_detail()
