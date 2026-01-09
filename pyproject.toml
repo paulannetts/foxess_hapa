@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Home Assistant custom component integration"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.13.2"
 dependencies = [
     "colorlog==6.10.1",
     "homeassistant==2025.12.5",
