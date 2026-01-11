@@ -238,7 +238,9 @@ class FoxessHapaApiClient:
     async def async_get_scheduler(self) -> dict[str, Any]:
         """Get current scheduler settings."""
         path = "/op/v0/device/scheduler/get"
-        result = await self._api_request("POST", path, data={"sn": self._device_sn})
+        result = await self._api_request(
+            "POST", path, data={"deviceSN": self._device_sn}
+        )
         return result.get("result", {})
 
     async def async_set_scheduler(
@@ -255,7 +257,7 @@ class FoxessHapaApiClient:
         """
         path = "/op/v0/device/scheduler/enable"
         data = {
-            "sn": self._device_sn,
+            "deviceSN": self._device_sn,
             "groups": periods,
             "enable": 1 if enable else 0,
         }
