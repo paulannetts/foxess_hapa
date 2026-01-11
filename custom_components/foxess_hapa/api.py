@@ -92,7 +92,7 @@ class FoxessHapaApiClient:
         The signature is generated from: {path}\r\n{token}\r\n{timestamp}
         """
         timestamp = round(time.time() * 1000)
-        signature_text = f"{path}\r\n{self._api_key}\r\n{timestamp}"
+        signature_text = rf"{path}\r\n{self._api_key}\r\n{timestamp}"
         # MD5 is required by FoxESS Cloud API specification
         signature = hashlib.md5(  # noqa: S324
             signature_text.encode("UTF-8")
@@ -125,7 +125,9 @@ class FoxessHapaApiClient:
         """Make an API request to FoxESS Cloud."""
         await self._rate_limit()
 
-        headers = self._generate_signature(path)
+        # Signature must be generated on base path only (without query string)
+        signature_path = path.split("?")[0]
+        headers = self._generate_signature(signature_path)
         url = f"{self.BASE_URL}{path}"
 
         try:
