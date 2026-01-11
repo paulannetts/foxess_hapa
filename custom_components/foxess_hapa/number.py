@@ -33,19 +33,6 @@ class FoxessHapaNumberEntityDescription(NumberEntityDescription):
 
 NUMBER_DESCRIPTIONS: tuple[FoxessHapaNumberEntityDescription, ...] = (
     FoxessHapaNumberEntityDescription(
-        key="min_soc",
-        translation_key="min_soc",
-        name="Min SoC",
-        native_min_value=10,
-        native_max_value=100,
-        native_step=1,
-        native_unit_of_measurement=PERCENTAGE,
-        device_class=NumberDeviceClass.BATTERY,
-        mode=NumberMode.SLIDER,
-        icon="mdi:battery-low",
-        value_attr="min_soc",
-    ),
-    FoxessHapaNumberEntityDescription(
         key="min_soc_on_grid",
         translation_key="min_soc_on_grid",
         name="Min SoC On Grid",
@@ -125,42 +112,36 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
             value,
         )
 
-        # Get current scheduler settings
         client = self.coordinator.config_entry.runtime_data.client
         try:
-            current_schedule = await client.async_get_scheduler()
+            groups = await client.async_get_schedule_groups()
 
-            # Modify the schedule with new minSoC value
-            # The structure depends on the current schedule
-            groups = current_schedule.get("groups", [])
+            # Map entity value_attr to scheduler API field names (v2 uses extraParam)
+            field_mapping = {
+                "min_soc_on_grid": "minSocOnGrid",
+            }
+            api_field = field_mapping.get(self.entity_description.value_attr)
+
+            if not api_field:
+                LOGGER.error("Unknown field: %s", self.entity_description.value_attr)
+                return
 
             if not groups:
                 # Create a default schedule period if none exists
+                groups = [{
+                    **client.minimal_group({}),
+                    "extraParam": {api_field: int(value)},
+                }]
+            else:
+                # Create minimal groups with extraParam containing the field to change
                 groups = [
                     {
-                        "enable": 1,
-                        "startHour": 0,
-                        "startMinute": 0,
-                        "endHour": 23,
-                        "endMinute": 59,
-                        "workMode": "SelfUse",
-                        "minSoc": int(value)
-                        if self.entity_description.value_attr == "min_soc"
-                        else 10,
-                        "minSocOnGrid": int(value)
-                        if self.entity_description.value_attr == "min_soc_on_grid"
-                        else 10,
+                        **client.minimal_group(g),
+                        "extraParam": {api_field: int(value)},
                     }
+                    for g in groups
                 ]
-            else:
-                # Update existing schedule periods
-                for group in groups:
-                    if self.entity_description.value_attr == "min_soc":
-                        group["minSoc"] = int(value)
-                    elif self.entity_description.value_attr == "min_soc_on_grid":
-                        group["minSocOnGrid"] = int(value)
 
-            # Apply the updated schedule
             success = await client.async_set_scheduler(groups, enable=True)
 
             if success:
