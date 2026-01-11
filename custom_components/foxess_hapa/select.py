@@ -105,8 +105,7 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
             else:
                 # Create minimal groups with only workMode changed
                 groups = [
-                    {**client.minimal_group(g), "workMode": option}
-                    for g in groups
+                    {**client.minimal_group(g), "workMode": option} for g in groups
                 ]
 
             success = await client.async_set_scheduler(groups, enable=True)

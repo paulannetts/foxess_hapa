@@ -128,10 +128,12 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
 
             if not groups:
                 # Create a default schedule period if none exists
-                groups = [{
-                    **client.minimal_group({}),
-                    "extraParam": {api_field: int(value)},
-                }]
+                groups = [
+                    {
+                        **client.minimal_group({}),
+                        "extraParam": {api_field: int(value)},
+                    }
+                ]
             else:
                 # Create minimal groups with extraParam containing the field to change
                 groups = [
