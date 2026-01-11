@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 class FoxessHapaNumberEntityDescription(NumberEntityDescription):
     """Describes a FoxESS HAPA number entity."""
 
-    value_attr: str  # Attribute name in battery_settings
+    value_attr: str  # Maps to FIELD_MAPPING key for scheduler extraParam
 
 
 # Map entity value_attr to scheduler API field names (v2 uses extraParam)
@@ -93,15 +93,22 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the current value."""
+        """Return the current value from scheduler data."""
         if not self.coordinator.data:
             return None
 
-        battery_settings = self.coordinator.data.get("battery_settings")
-        if not battery_settings:
+        groups = self.coordinator.data.get("scheduler_groups")
+        if not groups:
             return None
 
-        return getattr(battery_settings, self.entity_description.value_attr, None)
+        client = self.coordinator.config_entry.runtime_data.client
+        current_idx = client.find_current_period_index(groups)
+        if current_idx is None:
+            return None
+
+        extra_param = groups[current_idx].get("extraParam", {})
+        api_field = FIELD_MAPPING.get(self.entity_description.value_attr)
+        return extra_param.get(api_field)
 
     async def async_set_native_value(self, value: float) -> None:
         """

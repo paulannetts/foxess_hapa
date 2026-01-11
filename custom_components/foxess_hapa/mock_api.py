@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .api import (
-    FoxessBatterySettings,
     FoxessDeviceInfo,
     FoxessHapaApiClient,
     FoxessRealTimeData,
@@ -52,6 +51,7 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         self._battery_soc = 50.0  # Starting SOC
         self._min_soc = 10
         self._min_soc_on_grid = 10
+        self._work_mode = "SelfUse"
 
         LOGGER.info(
             "MockFoxessHapaApiClient initialized for device %s", device_serial_number
@@ -125,12 +125,12 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
 
         device_info = await self.async_get_device_detail()
         real_time = await self.async_get_real_time_data()
-        battery_settings = await self.async_get_battery_settings()
+        scheduler_groups = await self.async_get_schedule_groups()
 
         return {
             "device_info": device_info,
             "real_time": real_time,
-            "battery_settings": battery_settings,
+            "scheduler_groups": scheduler_groups,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -221,15 +221,6 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
             raw_variables=raw_variables,
         )
 
-    async def async_get_battery_settings(self) -> FoxessBatterySettings:
-        """Return mock battery settings."""
-        LOGGER.debug("MockFoxessHapaApiClient.async_get_battery_settings called")
-
-        return FoxessBatterySettings(
-            min_soc=self._min_soc,
-            min_soc_on_grid=self._min_soc_on_grid,
-        )
-
     async def async_get_scheduler(self) -> dict[str, Any]:
         """Return mock scheduler settings."""
         LOGGER.debug("MockFoxessHapaApiClient.async_get_scheduler called")
@@ -238,22 +229,15 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
             "enable": True,
             "groups": [
                 {
+                    "enable": 1,
                     "startHour": 0,
-                    "startMinute": 0,
-                    "endHour": 6,
-                    "endMinute": 0,
-                    "workMode": "SelfUse",
-                    "minSocOnGrid": 10,
-                    "minSoc": 10,
-                },
-                {
-                    "startHour": 6,
                     "startMinute": 0,
                     "endHour": 23,
                     "endMinute": 59,
-                    "workMode": "SelfUse",
-                    "minSocOnGrid": 10,
-                    "minSoc": 10,
+                    "workMode": self._work_mode,
+                    "extraParam": {
+                        "minSocOnGrid": self._min_soc_on_grid,
+                    },
                 },
             ],
         }
@@ -271,11 +255,14 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
             periods,
         )
 
-        # Update min_soc from the first period if provided
+        # Update settings from the current period if provided
         if periods:
-            self._min_soc = periods[0].get("minSoc", self._min_soc)
-            self._min_soc_on_grid = periods[0].get(
-                "minSocOnGrid", self._min_soc_on_grid
-            )
+            current_idx = self.find_current_period_index(periods)
+            if current_idx is not None:
+                period = periods[current_idx]
+                self._work_mode = period.get("workMode", self._work_mode)
+                extra_param = period.get("extraParam", {})
+                if "minSocOnGrid" in extra_param:
+                    self._min_soc_on_grid = extra_param["minSocOnGrid"]
 
         return True
