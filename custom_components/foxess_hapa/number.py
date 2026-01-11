@@ -136,13 +136,24 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
                     }
                 ]
             else:
-                # Create minimal groups with extraParam containing the field to change
+                # Find the current period and only update that one
+                current_idx = client.find_current_period_index(groups)
+                if current_idx is None:
+                    LOGGER.warning(
+                        "No schedule period covers the current time, cannot update %s",
+                        self.entity_description.key,
+                    )
+                    return
+
+                # Update only the current period, preserve others
                 groups = [
                     {
                         **client.minimal_group(g),
                         "extraParam": {api_field: int(value)},
                     }
-                    for g in groups
+                    if i == current_idx
+                    else client.minimal_group(g)
+                    for i, g in enumerate(groups)
                 ]
 
             success = await client.async_set_scheduler(groups, enable=True)
