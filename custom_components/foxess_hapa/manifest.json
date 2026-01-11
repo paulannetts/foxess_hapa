@@ -1,0 +1,12 @@
+{
+  "domain": "foxess_hapa",
+  "name": "FoxESS HAPA",
+  "codeowners": [
+    "@paulannetts"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/paulannetts/foxess_hapa",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/paulannetts/foxess_hapa/issues",
+  "version": "0.1.0"
+}

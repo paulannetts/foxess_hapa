@@ -11,7 +11,8 @@ on:
     branches:
       - main
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   hassfest: # https://developers.home-assistant.io/blog/2020/04/16/hassfest
@@ -24,13 +25,15 @@ jobs:
       - name: Run hassfest validation
         uses: home-assistant/actions/hassfest@87c064c607f3c5cc673a24258d0c98d23033bfc3 # master
 
-  hacs: # https://github.com/hacs/action
-    name: HACS validation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run HACS validation
-        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
-        with:
-          category: integration
-          # Remove this 'ignore' key when you have added brand images for your integration to https://github.com/home-assistant/brands
-          ignore: brands
+  # TODO: Re-enable HACS validation when repository is made public
+  # HACS only works with public repositories - see https://hacs.xyz/docs/faq/other_git_providers/
+  # hacs: # https://github.com/hacs/action
+  #   name: HACS validation
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Run HACS validation
+  #       uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+  #       with:
+  #         category: integration
+  #         # Remove this 'ignore' key when you have added brand images for your integration to https://github.com/home-assistant/brands
+  #         ignore: brands
