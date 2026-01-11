@@ -1,46 +1,99 @@
-# Notice
+# FoxESS HAPA
 
-The component and platforms in this repository are not meant to be used by a
-user, but as a "blueprint" that custom component developers can build
-upon, to make more awesome stuff.
+A Home Assistant custom component for FoxESS inverters using the FoxESS Cloud API.
 
-HAVE FUN! 😎
+## Features
 
-## Why?
+- Real-time monitoring of your FoxESS solar/battery system
+- 45+ sensors covering power, energy, temperatures, and status
+- Control battery work mode and minimum SoC settings
+- Uses the official FoxESS Cloud API (v1/v2)
 
-This is simple, by having custom_components look (README + structure) the same
-it is easier for developers to help each other and for users to start using them.
+## Installation
 
-If you are a developer and you want to add things to this "blueprint" that you think more
-developers will have use for, please open a PR to add it :)
+### HACS (Recommended)
 
-## What?
+1. Open HACS in Home Assistant
+2. Click the menu (three dots) and select "Custom repositories"
+3. Add `https://github.com/paulannetts/foxess_hapa` with category "Integration"
+4. Click "Add", then find "FoxESS HAPA" and click "Download"
+5. Restart Home Assistant
 
-This repository contains multiple files, here is a overview:
+### Manual Installation
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`custom_components/ha_test01/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`pyproject.toml` | Python project configuration and dependencies for development/lint/testing. | [Documentation](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/)
+1. Copy the `custom_components/foxess_hapa` folder to your Home Assistant `config/custom_components/` directory
+2. Restart Home Assistant
 
-## How?
+## Configuration
 
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `ha_test01` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `HA Test 01` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
+1. Go to Settings > Devices & Services > Add Integration
+2. Search for "FoxESS HAPA"
+3. Enter your device serial number and API key from [FoxESS Cloud](https://www.foxesscloud.com/)
 
-## Next steps
+## Available Entities
 
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon) to https://github.com/home-assistant/brands.
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+### Sensors (45)
+
+**Power Metrics:**
+- PV Power, Generation Power
+- Battery Power, Charge Power, Discharge Power
+- Grid Power, Grid Consumption Power, Feed-in Power
+- Load Power
+
+**PV Strings (PV1-4):**
+- Voltage, Current, Power for each string
+
+**EPS (Emergency Power Supply):**
+- EPS Power, R-phase Current, Voltage, Power
+
+**Grid Phase:**
+- R Current, R Voltage, Frequency, R Power
+
+**Temperature:**
+- Ambient, Inverter, Battery
+
+**Battery:**
+- SoC, Voltage, Current
+- Inverter Battery Voltage, Current, Power
+
+**Energy Totals (kWh):**
+- Total Generation, PV Energy Total
+- Grid Consumption Total, Feed-in Total, Loads Total
+- Charge Energy Total, Discharge Energy Total
+- Battery Throughput, Residual Energy
+
+**Status:**
+- Running State, Battery Status, Fault Info
+
+### Binary Sensors (4)
+
+- Has Battery
+- Battery Charging
+- Battery Discharging
+- Grid Exporting
+
+### Controls
+
+- **Work Mode** (Select): SelfUse, ForceCharge, ForceDischarge, Backup, FeedInFirst
+- **Min SoC on Grid** (Number): 10-100%
+
+## API Rate Limits
+
+FoxESS Cloud allows 1,440 API calls per day. This integration polls every 5 minutes, making 2 API calls per poll (device detail + real-time data), plus scheduler calls for battery-equipped devices (~576-864 calls/day), well within limits.
+
+## Development
+
+```bash
+# Install dependencies
+scripts/setup
+
+# Run Home Assistant with the integration
+scripts/develop
+
+# Lint and format code
+scripts/lint
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
