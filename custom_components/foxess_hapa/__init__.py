@@ -7,6 +7,7 @@ https://github.com/paulannetts/foxess_hapa
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,9 @@ from .api import FoxessHapaApiClient
 from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
 from .coordinator import FoxessHapaDataUpdateCoordinator
 from .data import FoxessHapaData
+
+# Check for mock mode via environment variable
+MOCK_API_ENABLED = os.environ.get("FOXESS_MOCK_API", "").lower() in ("1", "true", "yes")
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -37,18 +41,36 @@ async def async_setup_entry(
     entry: FoxessHapaConfigEntry,
 ) -> bool:
     """Set up this integration using UI."""
+    # Use mock client if FOXESS_MOCK_API environment variable is set
+    if MOCK_API_ENABLED:
+        from .mock_api import MockFoxessHapaApiClient  # noqa: PLC0415
+
+        LOGGER.warning(
+            "FOXESS_MOCK_API is enabled - using mock API client with simulated data"
+        )
+        client = MockFoxessHapaApiClient(
+            device_serial_number=entry.data[CONF_DEVICE_SERIAL_NUMBER],
+            api_key=entry.data[CONF_API_KEY],
+            session=async_get_clientsession(hass),
+        )
+        # Use shorter update interval for mock mode to see changes faster
+        update_interval = timedelta(minutes=1)
+    else:
+        client = FoxessHapaApiClient(
+            device_serial_number=entry.data[CONF_DEVICE_SERIAL_NUMBER],
+            api_key=entry.data[CONF_API_KEY],
+            session=async_get_clientsession(hass),
+        )
+        update_interval = timedelta(hours=1)
+
     coordinator = FoxessHapaDataUpdateCoordinator(
         hass=hass,
         logger=LOGGER,
         name=DOMAIN,
-        update_interval=timedelta(hours=1),
+        update_interval=update_interval,
     )
     entry.runtime_data = FoxessHapaData(
-        client=FoxessHapaApiClient(
-            device_serial_number=entry.data[CONF_DEVICE_SERIAL_NUMBER],
-            api_key=entry.data[CONF_API_KEY],
-            session=async_get_clientsession(hass),
-        ),
+        client=client,
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
     )

@@ -12,6 +12,8 @@ from typing import Any
 import aiohttp
 import async_timeout
 
+from .const import LOGGER
+
 
 class FoxessHapaApiClientError(Exception):
     """Exception to indicate a general API error."""
@@ -128,17 +130,19 @@ class FoxessHapaApiClient:
 
         try:
             async with async_timeout.timeout(75):
+                LOGGER.debug("API Request %s %s", method, url)
+                LOGGER.debug("API Readers %s", headers)
                 if method == "GET":
                     response = await self._session.get(url, headers=headers)
                 else:
+                    LOGGER.debug("Request Data: %s", data)
                     response = await self._session.post(url, headers=headers, json=data)
-
                 if response.status in (401, 403):
                     msg = "Invalid API key or unauthorized access"
                     raise FoxessHapaApiClientAuthenticationError(msg)
-                response.raise_for_status()
-
                 result = await response.json()
+                LOGGER.debug("result: %s", result)
+                response.raise_for_status()
 
                 # Check FoxESS response status
                 if result.get("errno") != 0:

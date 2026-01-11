@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
@@ -15,6 +17,9 @@ from .api import (
     FoxessHapaApiClientError,
 )
 from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
+
+# Check for mock mode via environment variable
+MOCK_API_ENABLED = os.environ.get("FOXESS_MOCK_API", "").lower() in ("1", "true", "yes")
 
 
 class FoxessHapaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -85,9 +90,22 @@ class FoxessHapaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self, device_serial_number: str, api_key: str
     ) -> FoxessDeviceInfo:
         """Validate credentials by fetching device info."""
-        client = FoxessHapaApiClient(
-            device_serial_number=device_serial_number,
-            api_key=api_key,
-            session=async_create_clientsession(self.hass),
-        )
+        # Use mock client if FOXESS_MOCK_API is set
+        if MOCK_API_ENABLED:
+            from .mock_api import MockFoxessHapaApiClient  # noqa: PLC0415
+
+            LOGGER.warning(
+                "FOXESS_MOCK_API is enabled - skipping credential validation"
+            )
+            client = MockFoxessHapaApiClient(
+                device_serial_number=device_serial_number,
+                api_key=api_key,
+                session=async_create_clientsession(self.hass),
+            )
+        else:
+            client = FoxessHapaApiClient(
+                device_serial_number=device_serial_number,
+                api_key=api_key,
+                session=async_create_clientsession(self.hass),
+            )
         return await client.async_get_device_detail()
