@@ -61,7 +61,7 @@ async def async_setup_entry(
             api_key=entry.data[CONF_API_KEY],
             session=async_get_clientsession(hass),
         )
-        update_interval = timedelta(hours=1)
+        update_interval = timedelta(minutes=5)
 
     coordinator = FoxessHapaDataUpdateCoordinator(
         hass=hass,
