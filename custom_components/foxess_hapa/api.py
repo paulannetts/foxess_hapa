@@ -46,6 +46,7 @@ class FoxessDeviceInfo:
 class FoxessRealTimeData:
     """Real-time data from FoxESS Cloud."""
 
+    # Main power metrics
     pv_power: float = 0.0
     battery_soc: float = 0.0
     battery_power: float = 0.0
@@ -54,6 +55,78 @@ class FoxessRealTimeData:
     feed_in_power: float = 0.0
     grid_consumption_power: float = 0.0
     generation_power: float = 0.0
+
+    # PV String 1
+    pv1_volt: float = 0.0
+    pv1_current: float = 0.0
+    pv1_power: float = 0.0
+
+    # PV String 2
+    pv2_volt: float = 0.0
+    pv2_current: float = 0.0
+    pv2_power: float = 0.0
+
+    # PV String 3
+    pv3_volt: float = 0.0
+    pv3_current: float = 0.0
+    pv3_power: float = 0.0
+
+    # PV String 4
+    pv4_volt: float = 0.0
+    pv4_current: float = 0.0
+    pv4_power: float = 0.0
+
+    # EPS (Emergency Power Supply)
+    eps_power: float = 0.0
+    eps_current_r: float = 0.0
+    eps_volt_r: float = 0.0
+    eps_power_r: float = 0.0
+
+    # Grid R-Phase
+    r_current: float = 0.0
+    r_volt: float = 0.0
+    r_freq: float = 0.0
+    r_power: float = 0.0
+
+    # Temperature sensors
+    ambient_temp: float = 0.0
+    inverter_temp: float = 0.0
+    battery_temp: float = 0.0
+
+    # Inverter battery interface
+    inv_bat_volt: float = 0.0
+    inv_bat_current: float = 0.0
+    inv_bat_power: float = 0.0
+
+    # Battery charge/discharge power
+    bat_charge_power: float = 0.0
+    bat_discharge_power: float = 0.0
+
+    # Battery direct measurements
+    bat_volt: float = 0.0
+    bat_current: float = 0.0
+
+    # Meter power
+    meter_power_2: float = 0.0
+
+    # Energy totals (kWh)
+    generation_total: float = 0.0
+    residual_energy: float = 0.0
+    energy_throughput: float = 0.0
+    grid_consumption_total: float = 0.0
+    loads_total: float = 0.0
+    feed_in_total: float = 0.0
+    charge_energy_total: float = 0.0
+    discharge_energy_total: float = 0.0
+    pv_energy_total: float = 0.0
+
+    # Status
+    running_state: str = ""
+    battery_status: str = ""
+    battery_status_name: str = ""
+    current_fault: str = ""
+    current_fault_count: int = 0
+
     raw_variables: dict[str, Any] | None = None
 
 
@@ -202,18 +275,95 @@ class FoxessHapaApiClient:
             value = var.get("value", 0)
             variables[name] = value
 
+        # Helper to safely convert values to float or int
+        def safe_float(key: str, default: float = 0.0) -> float:
+            val = variables.get(key, default)
+            return float(val) if val is not None else default
+
+        def safe_int(key: str, default: int = 0) -> int:
+            val = variables.get(key, default)
+            try:
+                return int(val) if val is not None else default
+            except (ValueError, TypeError):
+                return default
+
+        def safe_str(key: str, default: str = "") -> str:
+            val = variables.get(key, default)
+            return str(val) if val is not None else default
+
+        # Residual energy is reported in 0.01kWh units, convert to kWh
+        residual_energy_raw = safe_float("ResidualEnergy", 0)
+
         return FoxessRealTimeData(
-            pv_power=variables.get("pvPower", 0),
-            battery_soc=variables.get("SoC", 0),
+            # Main power metrics
+            pv_power=safe_float("pvPower"),
+            battery_soc=safe_float("SoC"),
             battery_power=(
-                variables.get("batChargePower", 0)
-                - variables.get("batDischargePower", 0)
+                safe_float("batChargePower") - safe_float("batDischargePower")
             ),
-            grid_power=variables.get("meterPower", 0),
-            load_power=variables.get("loadsPower", 0),
-            feed_in_power=variables.get("feedinPower", 0),
-            grid_consumption_power=variables.get("gridConsumptionPower", 0),
-            generation_power=variables.get("generationPower", 0),
+            grid_power=safe_float("meterPower"),
+            load_power=safe_float("loadsPower"),
+            feed_in_power=safe_float("feedinPower"),
+            grid_consumption_power=safe_float("gridConsumptionPower"),
+            generation_power=safe_float("generationPower"),
+            # PV String 1
+            pv1_volt=safe_float("pv1Volt"),
+            pv1_current=safe_float("pv1Current"),
+            pv1_power=safe_float("pv1Power"),
+            # PV String 2
+            pv2_volt=safe_float("pv2Volt"),
+            pv2_current=safe_float("pv2Current"),
+            pv2_power=safe_float("pv2Power"),
+            # PV String 3
+            pv3_volt=safe_float("pv3Volt"),
+            pv3_current=safe_float("pv3Current"),
+            pv3_power=safe_float("pv3Power"),
+            # PV String 4
+            pv4_volt=safe_float("pv4Volt"),
+            pv4_current=safe_float("pv4Current"),
+            pv4_power=safe_float("pv4Power"),
+            # EPS (Emergency Power Supply)
+            eps_power=safe_float("epsPower"),
+            eps_current_r=safe_float("epsCurrentR"),
+            eps_volt_r=safe_float("epsVoltR"),
+            eps_power_r=safe_float("epsPowerR"),
+            # Grid R-Phase
+            r_current=safe_float("RCurrent"),
+            r_volt=safe_float("RVolt"),
+            r_freq=safe_float("RFreq"),
+            r_power=safe_float("RPower"),
+            # Temperature sensors
+            ambient_temp=safe_float("ambientTemperation"),
+            inverter_temp=safe_float("invTemperation"),
+            battery_temp=safe_float("batTemperature"),
+            # Inverter battery interface
+            inv_bat_volt=safe_float("invBatVolt"),
+            inv_bat_current=safe_float("invBatCurrent"),
+            inv_bat_power=safe_float("invBatPower"),
+            # Battery charge/discharge power
+            bat_charge_power=safe_float("batChargePower"),
+            bat_discharge_power=safe_float("batDischargePower"),
+            # Battery direct measurements
+            bat_volt=safe_float("batVolt"),
+            bat_current=safe_float("batCurrent"),
+            # Meter power
+            meter_power_2=safe_float("meterPower2"),
+            # Energy totals (kWh)
+            generation_total=safe_float("generation"),
+            residual_energy=residual_energy_raw,
+            energy_throughput=safe_float("energyThroughput"),
+            grid_consumption_total=safe_float("gridConsumption"),
+            loads_total=safe_float("loads"),
+            feed_in_total=safe_float("feedin"),
+            charge_energy_total=safe_float("chargeEnergyToTal"),
+            discharge_energy_total=safe_float("dischargeEnergyToTal"),
+            pv_energy_total=safe_float("PVEnergyTotal"),
+            # Status
+            running_state=safe_str("runningState"),
+            battery_status=safe_str("batStatus"),
+            battery_status_name=safe_str("batStatusV2"),
+            current_fault=safe_str("currentFault"),
+            current_fault_count=safe_int("currentFaultCount"),
             raw_variables=variables,
         )
 
