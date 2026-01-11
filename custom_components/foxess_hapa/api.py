@@ -178,7 +178,7 @@ class FoxessHapaApiClient:
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
         """Get device details from FoxESS Cloud."""
-        path = "/op/v0/device/detail"
+        path = "/op/v1/device/detail"
         result = await self._api_request("GET", f"{path}?sn={self._device_sn}")
 
         data = result.get("result", {})
@@ -195,8 +195,8 @@ class FoxessHapaApiClient:
 
     async def async_get_real_time_data(self) -> FoxessRealTimeData:
         """Get real-time data from FoxESS Cloud."""
-        path = "/op/v0/device/real/query"
-        result = await self._api_request("POST", path, data={"sn": self._device_sn})
+        path = "/op/v1/device/real/query"
+        result = await self._api_request("POST", path, data={"sns": [self._device_sn]})
 
         # Parse the result - it returns a list of variables
         data = result.get("result", [])
