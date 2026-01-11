@@ -133,7 +133,6 @@ class FoxessHapaApiClient:
         try:
             async with async_timeout.timeout(75):
                 LOGGER.debug("API Request %s %s", method, url)
-                LOGGER.debug("API Readers %s", headers)
                 if method == "GET":
                     response = await self._session.get(url, headers=headers)
                 else:
