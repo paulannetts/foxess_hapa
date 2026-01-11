@@ -7,6 +7,7 @@ import hashlib
 import socket
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import aiohttp
@@ -266,6 +267,25 @@ class FoxessHapaApiClient:
             "endMinute": group.get("endMinute", 59),
             "workMode": group.get("workMode", "SelfUse"),
         }
+
+    @staticmethod
+    def find_current_period_index(groups: list[dict[str, Any]]) -> int | None:
+        """Find the index of the schedule period that covers the current time."""
+        now = datetime.now().astimezone()
+        current_minutes = now.hour * 60 + now.minute
+
+        for i, group in enumerate(groups):
+            start_minutes = group.get("startHour", 0) * 60 + group.get("startMinute", 0)
+            end_minutes = group.get("endHour", 23) * 60 + group.get("endMinute", 59)
+
+            # Handle periods that span midnight
+            if end_minutes < start_minutes:
+                if current_minutes >= start_minutes or current_minutes <= end_minutes:
+                    return i
+            elif start_minutes <= current_minutes <= end_minutes:
+                return i
+
+        return None
 
     @staticmethod
     def create_default_schedule_group(

@@ -103,9 +103,21 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
                 # Create a default schedule period if none exists
                 groups = [client.create_default_schedule_group(work_mode=option)]
             else:
-                # Create minimal groups with only workMode changed
+                # Find the current period and only update that one
+                current_idx = client.find_current_period_index(groups)
+                if current_idx is None:
+                    LOGGER.warning(
+                        "No schedule period covers the current time, "
+                        "cannot update work mode"
+                    )
+                    return
+
+                # Update only the current period, preserve others
                 groups = [
-                    {**client.minimal_group(g), "workMode": option} for g in groups
+                    {**client.minimal_group(g), "workMode": option}
+                    if i == current_idx
+                    else client.minimal_group(g)
+                    for i, g in enumerate(groups)
                 ]
 
             success = await client.async_set_scheduler(groups, enable=True)
