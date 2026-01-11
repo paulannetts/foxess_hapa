@@ -31,6 +31,11 @@ class FoxessHapaNumberEntityDescription(NumberEntityDescription):
     value_attr: str  # Attribute name in battery_settings
 
 
+# Map entity value_attr to scheduler API field names (v2 uses extraParam)
+FIELD_MAPPING: dict[str, str] = {
+    "min_soc_on_grid": "minSocOnGrid",
+}
+
 NUMBER_DESCRIPTIONS: tuple[FoxessHapaNumberEntityDescription, ...] = (
     FoxessHapaNumberEntityDescription(
         key="min_soc_on_grid",
@@ -116,18 +121,14 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
         try:
             groups = await client.async_get_schedule_groups()
 
-            # Map entity value_attr to scheduler API field names (v2 uses extraParam)
-            field_mapping = {
-                "min_soc_on_grid": "minSocOnGrid",
-            }
-            api_field = field_mapping.get(self.entity_description.value_attr)
-
+            api_field = FIELD_MAPPING.get(self.entity_description.value_attr)
             if not api_field:
                 LOGGER.error("Unknown field: %s", self.entity_description.value_attr)
                 return
 
             if not groups:
                 # Create a default schedule period if none exists
+                # Use minimal_group for base structure, add only our extraParam
                 groups = [
                     {
                         **client.minimal_group({}),
