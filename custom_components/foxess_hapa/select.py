@@ -97,39 +97,17 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
 
         client = self.coordinator.config_entry.runtime_data.client
         try:
-            # Get current scheduler settings
-            current_schedule = await client.async_get_scheduler()
-
-            # Get current battery settings for minSoC values
-            battery_settings = self.coordinator.data.get("battery_settings")
-            min_soc = battery_settings.min_soc if battery_settings else 10
-            min_soc_on_grid = (
-                battery_settings.min_soc_on_grid if battery_settings else 10
-            )
-
-            # Modify the schedule with new work mode
-            groups = current_schedule.get("groups", [])
+            groups = await client.async_get_schedule_groups()
 
             if not groups:
                 # Create a default schedule period if none exists
-                groups = [
-                    {
-                        "enable": 1,
-                        "startHour": 0,
-                        "startMinute": 0,
-                        "endHour": 23,
-                        "endMinute": 59,
-                        "workMode": option,
-                        "minSoc": min_soc,
-                        "minSocOnGrid": min_soc_on_grid,
-                    }
-                ]
+                groups = [client.create_default_schedule_group(work_mode=option)]
             else:
-                # Update existing schedule periods with new work mode
-                for group in groups:
-                    group["workMode"] = option
+                # Create minimal groups with only workMode changed
+                groups = [
+                    {**client.minimal_group(g), "workMode": option} for g in groups
+                ]
 
-            # Apply the updated schedule
             success = await client.async_set_scheduler(groups, enable=True)
 
             if success:

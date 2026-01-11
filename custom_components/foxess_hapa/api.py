@@ -92,7 +92,7 @@ class FoxessHapaApiClient:
         The signature is generated from: {path}\r\n{token}\r\n{timestamp}
         """
         timestamp = round(time.time() * 1000)
-        signature_text = f"{path}\r\n{self._api_key}\r\n{timestamp}"
+        signature_text = rf"{path}\r\n{self._api_key}\r\n{timestamp}"
         # MD5 is required by FoxESS Cloud API specification
         signature = hashlib.md5(  # noqa: S324
             signature_text.encode("UTF-8")
@@ -125,13 +125,14 @@ class FoxessHapaApiClient:
         """Make an API request to FoxESS Cloud."""
         await self._rate_limit()
 
-        headers = self._generate_signature(path)
+        # Signature must be generated on base path only (without query string)
+        signature_path = path.split("?")[0]
+        headers = self._generate_signature(signature_path)
         url = f"{self.BASE_URL}{path}"
 
         try:
             async with async_timeout.timeout(75):
                 LOGGER.debug("API Request %s %s", method, url)
-                LOGGER.debug("API Readers %s", headers)
                 if method == "GET":
                     response = await self._session.get(url, headers=headers)
                 else:
@@ -236,9 +237,53 @@ class FoxessHapaApiClient:
 
     async def async_get_scheduler(self) -> dict[str, Any]:
         """Get current scheduler settings."""
-        path = "/op/v0/device/scheduler/get"
-        result = await self._api_request("POST", path, data={"sn": self._device_sn})
+        path = "/op/v2/device/scheduler/get"
+        result = await self._api_request(
+            "POST", path, data={"deviceSN": self._device_sn}
+        )
         return result.get("result", {})
+
+    async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
+        """Get scheduler groups, filtering out zero-duration placeholders."""
+        schedule = await self.async_get_scheduler()
+        return [
+            g
+            for g in schedule.get("groups", [])
+            if not (
+                g.get("startHour") == g.get("endHour")
+                and g.get("startMinute") == g.get("endMinute")
+            )
+        ]
+
+    @staticmethod
+    def minimal_group(group: dict[str, Any]) -> dict[str, Any]:
+        """Extract minimal required fields from a group for v2 API updates."""
+        return {
+            "enable": group.get("enable", 1),
+            "startHour": group.get("startHour", 0),
+            "startMinute": group.get("startMinute", 0),
+            "endHour": group.get("endHour", 23),
+            "endMinute": group.get("endMinute", 59),
+            "workMode": group.get("workMode", "SelfUse"),
+        }
+
+    @staticmethod
+    def create_default_schedule_group(
+        work_mode: str = "SelfUse",
+        min_soc_on_grid: int = 10,
+    ) -> dict[str, Any]:
+        """Create a default 24-hour schedule group (v2 format)."""
+        return {
+            "enable": 1,
+            "startHour": 0,
+            "startMinute": 0,
+            "endHour": 23,
+            "endMinute": 59,
+            "workMode": work_mode,
+            "extraParam": {
+                "minSocOnGrid": min_soc_on_grid,
+            },
+        }
 
     async def async_set_scheduler(
         self,
@@ -252,11 +297,12 @@ class FoxessHapaApiClient:
         This is the main write endpoint for changing battery settings
         and work modes on FoxESS inverters.
         """
-        path = "/op/v0/device/scheduler/enable"
+        path = "/op/v2/device/scheduler/enable"
         data = {
-            "sn": self._device_sn,
+            "deviceSN": self._device_sn,
             "groups": periods,
             "enable": 1 if enable else 0,
+            "isDefault": False,  # Preserve unprovided parameters
         }
         result = await self._api_request("POST", path, data=data)
         return result.get("errno") == 0
