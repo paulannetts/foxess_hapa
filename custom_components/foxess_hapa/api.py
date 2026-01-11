@@ -57,14 +57,6 @@ class FoxessRealTimeData:
     raw_variables: dict[str, Any] | None = None
 
 
-@dataclass
-class FoxessBatterySettings:
-    """Battery settings from FoxESS Cloud."""
-
-    min_soc: int = 10
-    min_soc_on_grid: int = 10
-
-
 class FoxessHapaApiClient:
     """FoxESS Cloud API Client."""
 
@@ -167,14 +159,14 @@ class FoxessHapaApiClient:
         """Get all data from FoxESS Cloud (used by coordinator)."""
         device_info = await self.async_get_device_detail()
         real_time = await self.async_get_real_time_data()
-        battery_settings = None
+        scheduler_groups = None
         if device_info.has_battery:
-            battery_settings = await self.async_get_battery_settings()
+            scheduler_groups = await self.async_get_schedule_groups()
 
         return {
             "device_info": device_info,
             "real_time": real_time,
-            "battery_settings": battery_settings,
+            "scheduler_groups": scheduler_groups,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -223,17 +215,6 @@ class FoxessHapaApiClient:
             grid_consumption_power=variables.get("gridConsumptionPower", 0),
             generation_power=variables.get("generationPower", 0),
             raw_variables=variables,
-        )
-
-    async def async_get_battery_settings(self) -> FoxessBatterySettings:
-        """Get battery settings from FoxESS Cloud."""
-        path = "/op/v0/device/battery/soc/get"
-        result = await self._api_request("GET", f"{path}?sn={self._device_sn}")
-
-        data = result.get("result", {})
-        return FoxessBatterySettings(
-            min_soc=data.get("minSoc", 10),
-            min_soc_on_grid=data.get("minSocOnGrid", 10),
         )
 
     async def async_get_scheduler(self) -> dict[str, Any]:

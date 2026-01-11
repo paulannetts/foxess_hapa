@@ -78,9 +78,19 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        """Return the current work mode."""
-        # Work mode is stored in scheduler, not in real-time data
-        # We track it locally after setting
+        """Return the current work mode from scheduler data."""
+        if not self.coordinator.data:
+            return self._current_mode or "SelfUse"
+
+        groups = self.coordinator.data.get("scheduler_groups")
+        if not groups:
+            return self._current_mode or "SelfUse"
+
+        client = self.coordinator.config_entry.runtime_data.client
+        current_idx = client.find_current_period_index(groups)
+        if current_idx is not None:
+            return groups[current_idx].get("workMode", "SelfUse")
+
         return self._current_mode or "SelfUse"
 
     async def async_select_option(self, option: str) -> None:
