@@ -1,7 +1,7 @@
 {
     "name": "paulan/ha_test01",
     "image": "mcr.microsoft.com/devcontainers/python:3.13",
-    "postCreateCommand": "scripts/setup",
+    "postCreateCommand": "/home/vscode/post_create.sh",
     "forwardPorts": [
         8123
     ],
@@ -11,6 +11,21 @@
             "onAutoForward": "notify"
         }
     },
+    "workspaceMount": "source=foxess-hapa,target=/workspaces,type=volume",
+	"workspaceFolder": "/workspaces",
+    "mounts": [
+		// mount the post_create script to initialise the workspace on first run
+		"type=bind,src=${localWorkspaceFolder}/scripts/devcontainer_post_create.sh,dst=/home/vscode/post_create.sh",
+    ],
+    "runArgs": [
+		"--name",
+		"devcontainer-foxess-hapa",
+		"--hostname",
+		"foxess_hapa"
+    ],
+
+    // initialise the volume to redirect caches and init git repo
+	// as we set the workspaceFolder to poly_core we need to create it early!
     "customizations": {
         "vscode": {
             "extensions": [
@@ -21,6 +36,12 @@
                 "ryanluker.vscode-coverage-gutters"
             ],
             "settings": {
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/bin/zsh"
+                    }
+                },
                 "files.eol": "\n",
                 "editor.tabSize": 4,
                 "editor.formatOnPaste": true,
@@ -38,8 +59,12 @@
     },
     "remoteUser": "vscode",
     "features": {
+        "ghcr.io/devcontainers-extra/features/uv:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+			"version": "22.22.0"
+		},
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
         }
-    }
+    },
 }
