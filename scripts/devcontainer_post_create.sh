@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-if [[ ! -d '/workspaces/foxess_hapa/.git' ]]; then
+if [[ ! -d '/workspaces/.git' ]]; then
     printf "\nBootstrapping git repository (foxess_hapa/master), using SSH and mounted creds...\n"
     sudo chown -R vscode /workspaces
 
@@ -20,9 +20,8 @@ if [[ ! -d '/workspaces/foxess_hapa/.git' ]]; then
     mkdir -p ~/.ssh
     ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
-    cd /workspaces
-    git clone git@github.com:paulannetts/foxess_hapa.git foxess_hapa
+    git clone git@github.com:paulannetts/foxess_hapa.git /workspaces
 
-    /workspaces/foxess_hapa/scripts/setup
+    /workspaces/scripts/setup
 fi
 
