@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pip>=21.3.1",
-    "ruff==0.14.11",
+    "ruff==0.14.14",
 ]
 
 [tool.ruff]
