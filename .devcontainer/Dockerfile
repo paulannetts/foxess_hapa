@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/python:2.1.2-3.14-trixie
 
 # Update package lists and install desired packages
-RUN apt-get update && apt-get install -y \
+RUN rm -f /etc/apt/sources.list.d/yarn.list && \
+    apt-get update && apt-get install -y \
     ffmpeg libturbojpeg0 libpcap-dev \
     && rm -rf /var/lib/apt/lists/*
