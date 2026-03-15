@@ -65,6 +65,7 @@
 		},
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        }
+        },
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
     },
 }
