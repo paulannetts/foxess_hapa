@@ -65,9 +65,6 @@
         "ghcr.io/devcontainers/features/node:1": {
 			"version": "24.14.0"
 		},
-        "ghcr.io/devcontainers-extra/features/apt-packages:1": {
-            "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        },
         "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
     },
 }
