@@ -192,7 +192,7 @@ class FoxessHapaApiClient:
         await self._rate_limit()
 
         # Signature must be generated on base path only (without query string)
-        signature_path = path.split("?")[0]
+        signature_path = path.split("?", maxsplit=1)[0]
         headers = self._generate_signature(signature_path)
         url = f"{self.BASE_URL}{path}"
 
