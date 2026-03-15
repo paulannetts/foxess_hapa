@@ -1,6 +1,8 @@
 {
     "name": "paulan/ha_test01",
-    "image": "mcr.microsoft.com/devcontainers/python:3.13",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
     "postCreateCommand": "/home/vscode/post_create.sh",
     "forwardPorts": [
         8123
@@ -61,10 +63,8 @@
     "features": {
         "ghcr.io/devcontainers-extra/features/uv:1": {},
         "ghcr.io/devcontainers/features/node:1": {
-			"version": "22.22.0"
+			"version": "24.14.0"
 		},
-        "ghcr.io/devcontainers-extra/features/apt-packages:1": {
-            "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        }
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
     },
 }
