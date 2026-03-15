@@ -61,7 +61,7 @@
     "features": {
         "ghcr.io/devcontainers-extra/features/uv:1": {},
         "ghcr.io/devcontainers/features/node:1": {
-			"version": "22.22.0"
+			"version": "24.14.0"
 		},
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
