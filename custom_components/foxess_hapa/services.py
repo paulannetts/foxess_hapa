@@ -111,6 +111,9 @@ def _get_client_and_coordinator(
     if entry is None:
         msg = f"Config entry {config_entry_id!r} not found"
         raise ServiceValidationError(msg)
+    if entry.domain != DOMAIN:
+        msg = f"Config entry {config_entry_id!r} is not a {DOMAIN} entry"
+        raise ServiceValidationError(msg)
     runtime = getattr(entry, "runtime_data", None)
     if runtime is None:
         msg = f"Config entry {config_entry_id!r} is not loaded"

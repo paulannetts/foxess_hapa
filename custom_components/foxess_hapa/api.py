@@ -465,7 +465,7 @@ class FoxessHapaApiClient:
         # Pad to exactly _SCHEDULE_SLOT_COUNT with disabled zero-duration groups
         padded = list(periods)
         while len(padded) < _SCHEDULE_SLOT_COUNT:
-            padded.append(_PLACEHOLDER_GROUP)
+            padded.append(dict(_PLACEHOLDER_GROUP))
 
         path = "/op/v2/device/scheduler/enable"
         data = {
