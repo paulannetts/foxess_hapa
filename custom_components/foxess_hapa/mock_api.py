@@ -50,8 +50,46 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         self._battery_capacity_kwh = 10.0  # 10kWh battery
         self._battery_soc = 50.0  # Starting SOC
         self._min_soc = 10
-        self._min_soc_on_grid = 10
-        self._work_mode = "SelfUse"
+
+        # Default 4-period schedule (stored as API group dicts)
+        self._schedule_groups: list[dict] = [
+            {
+                "enable": 1,
+                "startHour": 0,
+                "startMinute": 0,
+                "endHour": 3,
+                "endMinute": 30,
+                "workMode": "ForceCharge",
+                "extraParam": {"minSocOnGrid": 10, "maxSoc": 90},
+            },
+            {
+                "enable": 1,
+                "startHour": 3,
+                "startMinute": 30,
+                "endHour": 5,
+                "endMinute": 30,
+                "workMode": "ForceCharge",
+                "extraParam": {"minSocOnGrid": 10, "maxSoc": 90},
+            },
+            {
+                "enable": 1,
+                "startHour": 5,
+                "startMinute": 30,
+                "endHour": 23,
+                "endMinute": 30,
+                "workMode": "SelfUse",
+                "extraParam": {"minSocOnGrid": 20},
+            },
+            {
+                "enable": 1,
+                "startHour": 23,
+                "startMinute": 0,
+                "endHour": 23,
+                "endMinute": 59,
+                "workMode": "SelfUse",
+                "extraParam": {"minSocOnGrid": 20},
+            },
+        ]
 
         LOGGER.info(
             "MockFoxessHapaApiClient initialized for device %s", device_serial_number
@@ -227,19 +265,7 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
 
         return {
             "enable": True,
-            "groups": [
-                {
-                    "enable": 1,
-                    "startHour": 0,
-                    "startMinute": 0,
-                    "endHour": 23,
-                    "endMinute": 59,
-                    "workMode": self._work_mode,
-                    "extraParam": {
-                        "minSocOnGrid": self._min_soc_on_grid,
-                    },
-                },
-            ],
+            "groups": self._schedule_groups,
         }
 
     async def async_set_scheduler(
@@ -248,21 +274,14 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         *,
         enable: bool = True,
     ) -> bool:
-        """Mock setting scheduler (updates internal state)."""
+        """Mock setting scheduler (stores all provided periods)."""
         LOGGER.info(
             "MockFoxessHapaApiClient.async_set_scheduler called: enable=%s, periods=%s",
             enable,
             periods,
         )
 
-        # Update settings from the current period if provided
         if periods:
-            current_idx = self.find_current_period_index(periods)
-            if current_idx is not None:
-                period = periods[current_idx]
-                self._work_mode = period.get("workMode", self._work_mode)
-                extra_param = period.get("extraParam", {})
-                if "minSocOnGrid" in extra_param:
-                    self._min_soc_on_grid = extra_param["minSocOnGrid"]
+            self._schedule_groups = list(periods)
 
         return True

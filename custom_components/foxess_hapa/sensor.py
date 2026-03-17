@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -589,13 +589,20 @@ async def async_setup_entry(
     """Set up the sensor platform."""
     coordinator = entry.runtime_data.coordinator
 
-    async_add_entities(
+    entities: list[FoxessHapaSensor | ScheduleSummarySensor] = [
         FoxessHapaSensor(
             coordinator=coordinator,
             entity_description=description,
         )
         for description in SENSOR_DESCRIPTIONS
-    )
+    ]
+
+    if coordinator.data:
+        device_info = coordinator.data.get("device_info")
+        if device_info and device_info.has_battery:
+            entities.append(ScheduleSummarySensor(coordinator=coordinator))
+
+    async_add_entities(entities)
 
 
 class FoxessHapaSensor(FoxessHapaEntity, SensorEntity):
@@ -626,3 +633,74 @@ class FoxessHapaSensor(FoxessHapaEntity, SensorEntity):
             return None
 
         return getattr(real_time, self.entity_description.value_fn, None)
+
+
+def _format_schedule_period(idx: int, group: dict[str, Any]) -> dict[str, Any]:
+    """Convert a raw API group dict to the sensor attribute period format."""
+    start = f"{group.get('startHour', 0):02d}:{group.get('startMinute', 0):02d}"
+    end = f"{group.get('endHour', 23):02d}:{group.get('endMinute', 59):02d}"
+    extra: dict[str, Any] = group.get("extraParam", {})
+    period: dict[str, Any] = {
+        "id": idx,
+        "enabled": bool(group.get("enable", 1)),
+        "start": start,
+        "end": end,
+        "work_mode": group.get("workMode", "SelfUse"),
+        "min_soc": extra.get("minSocOnGrid"),
+        "max_soc": extra.get("maxSoc"),
+    }
+    return period
+
+
+class ScheduleSummarySensor(FoxessHapaEntity, SensorEntity):
+    """Sensor exposing the full battery charge schedule as JSON attributes."""
+
+    _attr_translation_key = "schedule_summary"
+    _attr_name = "Schedule"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator: FoxessHapaDataUpdateCoordinator) -> None:
+        """Initialize the schedule summary sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_schedule_summary"
+
+    @property
+    def native_value(self) -> str:
+        """Return a human-readable summary of the schedule."""
+        if not self.coordinator.data:
+            return "No schedule"
+
+        groups: list[dict[str, Any]] = (
+            self.coordinator.data.get("scheduler_groups") or []
+        )
+        if not groups:
+            return "No schedule"
+
+        client = self.coordinator.config_entry.runtime_data.client
+        current_idx = client.find_current_period_index(groups)
+        if current_idx is not None:
+            g = groups[current_idx]
+            start = f"{g.get('startHour', 0):02d}:{g.get('startMinute', 0):02d}"
+            end = f"{g.get('endHour', 23):02d}:{g.get('endMinute', 59):02d}"
+            return f"{g.get('workMode', 'SelfUse')} ({start}-{end})"
+
+        return f"{len(groups)} periods configured"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return full schedule as structured attributes."""
+        if not self.coordinator.data:
+            return {}
+
+        groups: list[dict[str, Any]] = (
+            self.coordinator.data.get("scheduler_groups") or []
+        )
+
+        client = self.coordinator.config_entry.runtime_data.client
+        current_idx = client.find_current_period_index(groups)
+
+        return {
+            "periods": [_format_schedule_period(i, g) for i, g in enumerate(groups)],
+            "current_period_index": current_idx,
+            "total_periods": len(groups),
+        }

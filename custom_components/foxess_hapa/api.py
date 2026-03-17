@@ -390,7 +390,7 @@ class FoxessHapaApiClient:
     @staticmethod
     def minimal_group(group: dict[str, Any]) -> dict[str, Any]:
         """Extract minimal required fields from a group for v2 API updates."""
-        return {
+        result: dict[str, Any] = {
             "enable": group.get("enable", 1),
             "startHour": group.get("startHour", 0),
             "startMinute": group.get("startMinute", 0),
@@ -398,6 +398,9 @@ class FoxessHapaApiClient:
             "endMinute": group.get("endMinute", 59),
             "workMode": group.get("workMode", "SelfUse"),
         }
+        if "extraParam" in group:
+            result["extraParam"] = group["extraParam"]
+        return result
 
     @staticmethod
     def find_current_period_index(groups: list[dict[str, Any]]) -> int | None:

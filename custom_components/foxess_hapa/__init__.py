@@ -19,6 +19,7 @@ from .api import FoxessHapaApiClient
 from .const import CONF_API_KEY, CONF_DEVICE_SERIAL_NUMBER, DOMAIN, LOGGER
 from .coordinator import FoxessHapaDataUpdateCoordinator
 from .data import FoxessHapaData
+from .services import async_setup_services
 
 # Check for mock mode via environment variable
 MOCK_API_ENABLED = os.environ.get("FOXESS_MOCK_API", "").lower() in ("1", "true", "yes")
@@ -76,6 +77,8 @@ async def async_setup_entry(
     )
 
     await coordinator.async_config_entry_first_refresh()
+
+    await async_setup_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
