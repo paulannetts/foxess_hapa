@@ -376,12 +376,13 @@ class FoxessHapaApiClient:
         return result.get("result", {})
 
     async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
-        """Get scheduler groups, filtering out zero-duration placeholders."""
+        """Get scheduler groups, filtering out disabled and zero-duration ones."""
         schedule = await self.async_get_scheduler()
         return [
             g
             for g in schedule.get("groups", [])
-            if not (
+            if g.get("enable", 1) != 0
+            and not (
                 g.get("startHour") == g.get("endHour")
                 and g.get("startMinute") == g.get("endMinute")
             )
