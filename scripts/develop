@@ -4,6 +4,15 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# --reset: wipe HA state (storage, database, logs) so onboarding starts fresh
+if [[ "${1}" == "--reset" ]]; then
+    echo "Resetting config state..."
+    rm -rf "${PWD}/config/.storage"
+    rm -f "${PWD}/config/home-assistant_v2.db"*
+    rm -f "${PWD}/config/home-assistant.log"*
+    echo "Done. HA will start fresh."
+fi
+
 # Create config dir if not present
 if [[ ! -d "${PWD}/config" ]]; then
     mkdir -p "${PWD}/config"

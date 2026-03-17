@@ -1,0 +1,96 @@
+set_schedule:
+  name: Set Schedule
+  description: Replace the full battery charge schedule with a new set of time periods.
+  fields:
+    config_entry_id:
+      name: Device
+      description: The FoxESS device to update.
+      required: true
+      selector:
+        config_entry:
+          integration: foxess_hapa
+    periods:
+      name: Periods
+      description: >
+        List of 1–8 schedule periods. Each period must have start_time, end_time,
+        and work_mode. min_soc and max_soc are optional.
+      required: true
+      example:
+        - start_time: "00:00"
+          end_time: "03:30"
+          work_mode: ForceCharge
+          min_soc: 10
+          max_soc: 90
+        - start_time: "03:30"
+          end_time: "23:59"
+          work_mode: SelfUse
+          min_soc: 20
+      selector:
+        object:
+
+set_slot:
+  name: Set Slot
+  description: Update a single schedule slot by index, preserving all other slots.
+  fields:
+    config_entry_id:
+      name: Device
+      description: The FoxESS device to update.
+      required: true
+      selector:
+        config_entry:
+          integration: foxess_hapa
+    slot:
+      name: Slot
+      description: Zero-based index of the slot to update (0–7).
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 7
+          mode: box
+    start_time:
+      name: Start time
+      description: "Start time for the slot in HH:MM format."
+      example: "00:00"
+      selector:
+        text:
+    end_time:
+      name: End time
+      description: "End time for the slot in HH:MM format."
+      example: "03:30"
+      selector:
+        text:
+    work_mode:
+      name: Work mode
+      description: Battery work mode for this slot.
+      selector:
+        select:
+          options:
+            - SelfUse
+            - ForceCharge
+            - ForceDischarge
+            - Backup
+            - FeedInFirst
+    enabled:
+      name: Enabled
+      description: Whether this slot is active.
+      selector:
+        boolean:
+    min_soc:
+      name: Min SoC
+      description: Minimum battery state of charge (%) on grid power.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    max_soc:
+      name: Max SoC
+      description: Maximum battery state of charge (%) to charge to.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider

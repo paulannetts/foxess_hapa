@@ -15,6 +15,16 @@ import async_timeout
 
 from .const import LOGGER
 
+_SCHEDULE_SLOT_COUNT = 8
+_PLACEHOLDER_GROUP: dict[str, Any] = {
+    "enable": 0,
+    "startHour": 0,
+    "startMinute": 0,
+    "endHour": 0,
+    "endMinute": 0,
+    "workMode": "SelfUse",
+}
+
 
 class FoxessHapaApiClientError(Exception):
     """Exception to indicate a general API error."""
@@ -376,12 +386,13 @@ class FoxessHapaApiClient:
         return result.get("result", {})
 
     async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
-        """Get scheduler groups, filtering out zero-duration placeholders."""
+        """Get scheduler groups, filtering out disabled and zero-duration ones."""
         schedule = await self.async_get_scheduler()
         return [
             g
             for g in schedule.get("groups", [])
-            if not (
+            if g.get("enable", 1) != 0
+            and not (
                 g.get("startHour") == g.get("endHour")
                 and g.get("startMinute") == g.get("endMinute")
             )
@@ -390,7 +401,7 @@ class FoxessHapaApiClient:
     @staticmethod
     def minimal_group(group: dict[str, Any]) -> dict[str, Any]:
         """Extract minimal required fields from a group for v2 API updates."""
-        return {
+        result: dict[str, Any] = {
             "enable": group.get("enable", 1),
             "startHour": group.get("startHour", 0),
             "startMinute": group.get("startMinute", 0),
@@ -398,6 +409,9 @@ class FoxessHapaApiClient:
             "endMinute": group.get("endMinute", 59),
             "workMode": group.get("workMode", "SelfUse"),
         }
+        if "extraParam" in group:
+            result["extraParam"] = group["extraParam"]
+        return result
 
     @staticmethod
     def find_current_period_index(groups: list[dict[str, Any]]) -> int | None:
@@ -448,10 +462,15 @@ class FoxessHapaApiClient:
         This is the main write endpoint for changing battery settings
         and work modes on FoxESS inverters.
         """
+        # Pad to exactly _SCHEDULE_SLOT_COUNT with disabled zero-duration groups
+        padded = list(periods)
+        while len(padded) < _SCHEDULE_SLOT_COUNT:
+            padded.append(dict(_PLACEHOLDER_GROUP))
+
         path = "/op/v2/device/scheduler/enable"
         data = {
             "deviceSN": self._device_sn,
-            "groups": periods,
+            "groups": padded,
             "enable": 1 if enable else 0,
             "isDefault": False,  # Preserve unprovided parameters
         }
