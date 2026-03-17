@@ -15,6 +15,16 @@ import async_timeout
 
 from .const import LOGGER
 
+_SCHEDULE_SLOT_COUNT = 8
+_PLACEHOLDER_GROUP: dict[str, Any] = {
+    "enable": 0,
+    "startHour": 0,
+    "startMinute": 0,
+    "endHour": 0,
+    "endMinute": 0,
+    "workMode": "SelfUse",
+}
+
 
 class FoxessHapaApiClientError(Exception):
     """Exception to indicate a general API error."""
@@ -452,10 +462,15 @@ class FoxessHapaApiClient:
         This is the main write endpoint for changing battery settings
         and work modes on FoxESS inverters.
         """
+        # Pad to exactly _SCHEDULE_SLOT_COUNT with disabled zero-duration groups
+        padded = list(periods)
+        while len(padded) < _SCHEDULE_SLOT_COUNT:
+            padded.append(_PLACEHOLDER_GROUP)
+
         path = "/op/v2/device/scheduler/enable"
         data = {
             "deviceSN": self._device_sn,
-            "groups": periods,
+            "groups": padded,
             "enable": 1 if enable else 0,
             "isDefault": False,  # Preserve unprovided parameters
         }
