@@ -32,7 +32,8 @@ _PERIOD_SCHEMA = vol.Schema(
         vol.Optional("enabled", default=True): cv.boolean,
         vol.Optional("min_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
         vol.Optional("max_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
-    }
+    },
+    extra=vol.REMOVE_EXTRA,
 )
 
 SCHEMA_SET_SCHEDULE = vol.Schema(

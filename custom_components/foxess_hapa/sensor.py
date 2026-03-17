@@ -643,8 +643,8 @@ def _format_schedule_period(idx: int, group: dict[str, Any]) -> dict[str, Any]:
     period: dict[str, Any] = {
         "id": idx,
         "enabled": bool(group.get("enable", 1)),
-        "start": start,
-        "end": end,
+        "start_time": start,
+        "end_time": end,
         "work_mode": group.get("workMode", "SelfUse"),
         "min_soc": extra.get("minSocOnGrid"),
         "max_soc": extra.get("maxSoc"),
