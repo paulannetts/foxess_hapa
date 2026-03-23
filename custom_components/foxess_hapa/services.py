@@ -32,6 +32,12 @@ _PERIOD_SCHEMA = vol.Schema(
         vol.Optional("enabled", default=True): cv.boolean,
         vol.Optional("min_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
         vol.Optional("max_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
+        vol.Optional("charge_to_soc"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=100)
+        ),
+        vol.Optional("charge_power"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=6000)
+        ),
     },
     extra=vol.REMOVE_EXTRA,
 )
@@ -56,6 +62,12 @@ SCHEMA_SET_SLOT = vol.Schema(
         vol.Optional("enabled"): cv.boolean,
         vol.Optional("min_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
         vol.Optional("max_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
+        vol.Optional("charge_to_soc"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=100)
+        ),
+        vol.Optional("charge_power"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=6000)
+        ),
     }
 )
 
@@ -97,6 +109,10 @@ def _period_to_group(period: dict) -> dict:
         extra_param["minSocOnGrid"] = period["min_soc"]
     if "max_soc" in period:
         extra_param["maxSoc"] = period["max_soc"]
+    if "charge_to_soc" in period:
+        extra_param["fdSoc"] = period["charge_to_soc"]
+    if "charge_power" in period:
+        extra_param["fdPwr"] = period["charge_power"]
     if extra_param:
         group["extraParam"] = extra_param
 
@@ -182,6 +198,10 @@ async def _handle_set_slot(call: ServiceCall) -> None:
         extra_param["minSocOnGrid"] = data["min_soc"]
     if "max_soc" in data:
         extra_param["maxSoc"] = data["max_soc"]
+    if "charge_to_soc" in data:
+        extra_param["fdSoc"] = data["charge_to_soc"]
+    if "charge_power" in data:
+        extra_param["fdPwr"] = data["charge_power"]
     if extra_param:
         group["extraParam"] = extra_param
 
