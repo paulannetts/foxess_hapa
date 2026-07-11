@@ -67,10 +67,15 @@ set_slot:
         select:
           options:
             - SelfUse
+            - Feedin
+            - Backup
             - ForceCharge
             - ForceDischarge
-            - Backup
-            - FeedInFirst
+            - ForceCharge(BAT)
+            - ForceDischarge(BAT)
+            - ForceCharge(AC)
+            - ForceDischarge(AC)
+            - PeakShaving
     enabled:
       name: Enabled
       description: Whether this slot is active.

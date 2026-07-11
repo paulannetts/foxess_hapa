@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 
+from .api import DEFAULT_WORK_MODE_OPTIONS
 from .const import LOGGER
 from .entity import FoxessHapaEntity
 
@@ -16,15 +17,6 @@ if TYPE_CHECKING:
     from .coordinator import FoxessHapaDataUpdateCoordinator
     from .data import FoxessHapaConfigEntry
 
-
-# FoxESS work modes
-WORK_MODES = [
-    "SelfUse",
-    "ForceCharge",
-    "ForceDischarge",
-    "Backup",
-    "FeedInFirst",
-]
 
 SELECT_DESCRIPTIONS: tuple[SelectEntityDescription, ...] = (
     SelectEntityDescription(
@@ -61,7 +53,6 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
     """FoxESS HAPA Select class for work mode."""
 
     entity_description: SelectEntityDescription
-    _attr_options = WORK_MODES
 
     def __init__(
         self,
@@ -75,6 +66,15 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
             f"{coordinator.config_entry.entry_id}_{entity_description.key}"
         )
         self._current_mode: str | None = None
+
+    @property
+    def options(self) -> list[str]:
+        """Return the work modes supported by this device."""
+        if not self.coordinator.data:
+            return DEFAULT_WORK_MODE_OPTIONS
+
+        options = self.coordinator.data.get("work_mode_options")
+        return options or DEFAULT_WORK_MODE_OPTIONS
 
     @property
     def current_option(self) -> str | None:
@@ -99,7 +99,7 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
 
         Note: FoxESS requires using the scheduler API to change work modes.
         """
-        if option not in WORK_MODES:
+        if option not in self.options:
             LOGGER.error("Invalid work mode: %s", option)
             return
 

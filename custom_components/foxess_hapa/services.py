@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
+from .api import DEFAULT_WORK_MODE_OPTIONS
 from .const import DOMAIN, LOGGER
 
 if TYPE_CHECKING:
@@ -16,13 +17,7 @@ if TYPE_CHECKING:
 SERVICE_SET_SCHEDULE = "set_schedule"
 SERVICE_SET_SLOT = "set_slot"
 
-_VALID_WORK_MODES = [
-    "SelfUse",
-    "ForceCharge",
-    "ForceDischarge",
-    "Backup",
-    "FeedInFirst",
-]
+_VALID_WORK_MODES = DEFAULT_WORK_MODE_OPTIONS
 
 _PERIOD_SCHEMA = vol.Schema(
     {
