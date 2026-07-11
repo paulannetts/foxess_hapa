@@ -16,6 +16,24 @@ import async_timeout
 from .const import LOGGER
 
 _SCHEDULE_SLOT_COUNT = 8
+
+# Fallback work modes, used only if the API response omits
+# properties.workmode.enumList. Kept as a superset of every mode seen in
+# FoxESS's Open API docs and community firmware notes, since the actual set
+# varies by device/firmware.
+DEFAULT_WORK_MODE_OPTIONS: list[str] = [
+    "SelfUse",
+    "Feedin",
+    "Backup",
+    "ForceCharge",
+    "ForceDischarge",
+    "ForceCharge(BAT)",
+    "ForceDischarge(BAT)",
+    "ForceCharge(AC)",
+    "ForceDischarge(AC)",
+    "PeakShaving",
+]
+
 _PLACEHOLDER_GROUP: dict[str, Any] = {
     "enable": 0,
     "startHour": 0,
@@ -243,13 +261,17 @@ class FoxessHapaApiClient:
         device_info = await self.async_get_device_detail()
         real_time = await self.async_get_real_time_data()
         scheduler_groups = None
+        work_mode_options = None
         if device_info.has_battery:
-            scheduler_groups = await self.async_get_schedule_groups()
+            schedule = await self.async_get_scheduler()
+            scheduler_groups = self._filter_active_groups(schedule.get("groups", []))
+            work_mode_options = self._extract_work_mode_options(schedule)
 
         return {
             "device_info": device_info,
             "real_time": real_time,
             "scheduler_groups": scheduler_groups,
+            "work_mode_options": work_mode_options,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -388,15 +410,30 @@ class FoxessHapaApiClient:
     async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
         """Get scheduler groups, filtering out disabled and zero-duration ones."""
         schedule = await self.async_get_scheduler()
+        return self._filter_active_groups(schedule.get("groups", []))
+
+    @staticmethod
+    def _filter_active_groups(
+        groups: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Filter out disabled and zero-duration schedule groups."""
         return [
             g
-            for g in schedule.get("groups", [])
+            for g in groups
             if g.get("enable", 1) != 0
             and not (
                 g.get("startHour") == g.get("endHour")
                 and g.get("startMinute") == g.get("endMinute")
             )
         ]
+
+    @staticmethod
+    def _extract_work_mode_options(schedule: dict[str, Any]) -> list[str]:
+        """Get the device's supported work modes, falling back to a default set."""
+        enum_list = schedule.get("properties", {}).get("workmode", {}).get("enumList")
+        if enum_list:
+            return list(enum_list)
+        return list(DEFAULT_WORK_MODE_OPTIONS)
 
     @staticmethod
     def minimal_group(group: dict[str, Any]) -> dict[str, Any]:

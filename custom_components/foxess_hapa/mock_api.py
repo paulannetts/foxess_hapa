@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .api import (
+    DEFAULT_WORK_MODE_OPTIONS,
     FoxessDeviceInfo,
     FoxessHapaApiClient,
     FoxessRealTimeData,
@@ -163,12 +164,15 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
 
         device_info = await self.async_get_device_detail()
         real_time = await self.async_get_real_time_data()
-        scheduler_groups = await self.async_get_schedule_groups()
+        schedule = await self.async_get_scheduler()
+        scheduler_groups = self._filter_active_groups(schedule.get("groups", []))
+        work_mode_options = self._extract_work_mode_options(schedule)
 
         return {
             "device_info": device_info,
             "real_time": real_time,
             "scheduler_groups": scheduler_groups,
+            "work_mode_options": work_mode_options,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -266,6 +270,9 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         return {
             "enable": True,
             "groups": self._schedule_groups,
+            "properties": {
+                "workmode": {"enumList": DEFAULT_WORK_MODE_OPTIONS},
+            },
         }
 
     async def async_set_scheduler(
