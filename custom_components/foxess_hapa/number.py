@@ -187,7 +187,7 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
 
         client = self.coordinator.config_entry.runtime_data.client
         try:
-            groups = await client.async_get_schedule_groups()
+            groups = await client.async_get_schedule_groups(active_only=False)
 
             api_field = self._api_field
             if not api_field:
@@ -228,7 +228,7 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
                     for i, g in enumerate(groups)
                 ]
 
-            success = await client.async_set_scheduler(groups, enable=True)
+            success = await client.async_set_scheduler(groups, enable=True, pad=False)
 
             if success:
                 LOGGER.info(

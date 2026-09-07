@@ -240,19 +240,24 @@ async def _handle_set_slot(call: ServiceCall) -> None:
     slot_idx: int = data["slot"]
 
     try:
-        groups = await client.async_get_schedule_groups()
+        groups = await client.async_get_schedule_groups(active_only=False)
     except Exception as ex:
         msg = f"Failed to fetch current schedule: {ex}"
         raise HomeAssistantError(msg) from ex
 
-    if slot_idx >= len(groups):
+    # `slot` addresses active periods, which is what the schedule sensor shows,
+    # but the write has to go back as the device's full list so untouched slots
+    # (including its disabled ones) survive.
+    active = client.active_group_indices(groups)
+    if slot_idx >= len(active):
         msg = (
-            f"Slot {slot_idx} does not exist; schedule only has {len(groups)} period(s)"
+            f"Slot {slot_idx} does not exist; schedule only has {len(active)} period(s)"
         )
         raise ServiceValidationError(msg)
+    target = active[slot_idx]
 
     # Start from minimal representation (preserves extraParam)
-    group = dict(client.minimal_group(groups[slot_idx]))
+    group = dict(client.minimal_group(groups[target]))
 
     if "start_time" in data:
         h, m = _parse_time(data["start_time"])
@@ -268,7 +273,7 @@ async def _handle_set_slot(call: ServiceCall) -> None:
         group["enable"] = 1 if data["enabled"] else 0
 
     # Merge extraParam fields into existing params
-    extra_param = dict(groups[slot_idx].get("extraParam", {}))
+    extra_param = dict(groups[target].get("extraParam", {}))
     extra_param.update(
         {
             api_field: data[key]
@@ -280,14 +285,18 @@ async def _handle_set_slot(call: ServiceCall) -> None:
         group["extraParam"] = extra_param
 
     updated_groups = [
-        group if i == slot_idx else client.minimal_group(g)
-        for i, g in enumerate(groups)
+        group if i == target else client.minimal_group(g) for i, g in enumerate(groups)
     ]
 
-    LOGGER.info("set_slot: updating slot %d of %d", slot_idx, len(updated_groups))
+    LOGGER.info(
+        "set_slot: updating active slot %d (device group %d of %d)",
+        slot_idx,
+        target,
+        len(updated_groups),
+    )
 
     try:
-        await client.async_set_scheduler(updated_groups, enable=True)
+        await client.async_set_scheduler(updated_groups, enable=True, pad=False)
     except Exception as ex:
         msg = f"Failed to update slot: {ex}"
         raise HomeAssistantError(msg) from ex

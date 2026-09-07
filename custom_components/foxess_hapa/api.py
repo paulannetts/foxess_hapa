@@ -414,25 +414,50 @@ class FoxessHapaApiClient:
         )
         return result.get("result", {})
 
-    async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
-        """Get scheduler groups, filtering out disabled and zero-duration ones."""
+    async def async_get_schedule_groups(
+        self,
+        *,
+        active_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        """
+        Get scheduler groups.
+
+        Reads default to active groups only, so disabled placeholders do not
+        surface as real periods. Writes should pass active_only=False and send
+        the device's full list back: a partial update built from a filtered list
+        loses the device's disabled slots, and padding then recreates them as
+        generic placeholders.
+        """
         schedule = await self.async_get_scheduler()
-        return self._filter_active_groups(schedule.get("groups", []))
+        groups = schedule.get("groups", [])
+        return self._filter_active_groups(groups) if active_only else list(groups)
 
     @staticmethod
+    def is_active_group(group: dict[str, Any]) -> bool:
+        """Whether a group is enabled and covers a non-zero span of time."""
+        return group.get("enable", 1) != 0 and not (
+            group.get("startHour") == group.get("endHour")
+            and group.get("startMinute") == group.get("endMinute")
+        )
+
+    @classmethod
     def _filter_active_groups(
+        cls,
         groups: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Filter out disabled and zero-duration schedule groups."""
-        return [
-            g
-            for g in groups
-            if g.get("enable", 1) != 0
-            and not (
-                g.get("startHour") == g.get("endHour")
-                and g.get("startMinute") == g.get("endMinute")
-            )
-        ]
+        return [g for g in groups if cls.is_active_group(g)]
+
+    @classmethod
+    def active_group_indices(cls, groups: list[dict[str, Any]]) -> list[int]:
+        """
+        Map active-period position to index in the full group list.
+
+        Services address slots by their position among active periods, which is
+        what users see; writes need the corresponding index in the device's full
+        list so untouched slots survive.
+        """
+        return [i for i, g in enumerate(groups) if cls.is_active_group(g)]
 
     @staticmethod
     def _extract_work_mode_options(schedule: dict[str, Any]) -> list[str]:
@@ -523,6 +548,11 @@ class FoxessHapaApiClient:
         catch_all: int | None = None
 
         for i, group in enumerate(groups):
+            # Callers may pass the device's full list, which includes disabled
+            # and zero-duration placeholders; those never govern.
+            if not cls.is_active_group(group):
+                continue
+
             start_minutes, end_minutes = cls.group_window(group)
 
             # Handle periods that span midnight
@@ -570,17 +600,24 @@ class FoxessHapaApiClient:
         periods: list[dict[str, Any]],
         *,
         enable: bool = True,
+        pad: bool = True,
     ) -> bool:
         """
         Set scheduler settings (for minSoC and work mode changes).
 
         This is the main write endpoint for changing battery settings
         and work modes on FoxESS inverters.
+
+        Padding to a full slot count clears any slots the caller omitted, rather
+        than letting the API fill the gaps unpredictably, so it suits a full
+        replace. Partial updates must pass pad=False and supply the device's
+        whole group list; otherwise the placeholders overwrite slots the caller
+        never intended to touch.
         """
-        # Pad to exactly _SCHEDULE_SLOT_COUNT with disabled zero-duration groups
         padded = list(periods)
-        while len(padded) < _SCHEDULE_SLOT_COUNT:
-            padded.append(dict(_PLACEHOLDER_GROUP))
+        if pad:
+            while len(padded) < _SCHEDULE_SLOT_COUNT:
+                padded.append(dict(_PLACEHOLDER_GROUP))
 
         path = "/op/v2/device/scheduler/enable"
         data = {
