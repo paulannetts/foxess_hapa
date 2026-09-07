@@ -13,7 +13,10 @@ set_schedule:
       name: Periods
       description: >
         List of 1–8 schedule periods. Each period must have start_time, end_time,
-        and work_mode. min_soc and max_soc are optional.
+        and work_mode. min_soc, max_soc, fd_soc and fd_pwr are optional.
+        Supported work modes vary by device and are validated against the
+        device's own list; fd_soc/fd_pwr are validated against its reported
+        ranges.
       required: true
       example:
         - start_time: "00:00"
@@ -65,6 +68,7 @@ set_slot:
       description: Battery work mode for this slot.
       selector:
         select:
+          custom_value: true
           options:
             - SelfUse
             - Feedin
@@ -99,3 +103,27 @@ set_slot:
           max: 100
           unit_of_measurement: "%"
           mode: slider
+    fd_soc:
+      name: Force charge/discharge SoC
+      description: >
+        SoC at which Force Charge or Force Discharge stops (the FoxESS app calls
+        this "Discharging Cut-off SoC" on a discharge slot). Applies to both force
+        modes. Device-specific range; commonly 10-100%.
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: box
+    fd_pwr:
+      name: Force charge/discharge power
+      description: >
+        Maximum power for Force Charge or Force Discharge (the FoxESS app calls
+        this "Discharge Power to Grid" on a discharge slot). Device-specific
+        maximum - an H3 reports 10500 W - and validated against the device.
+      selector:
+        number:
+          min: 0
+          max: 100000
+          unit_of_measurement: "W"
+          mode: box

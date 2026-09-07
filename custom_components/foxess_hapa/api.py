@@ -16,6 +16,10 @@ import async_timeout
 from .const import LOGGER
 
 _SCHEDULE_SLOT_COUNT = 8
+_MINUTES_PER_DAY = 24 * 60
+# A group running 00:00-23:59 is the FoxESS app's "remaining time slots"
+# catch-all, which overlaps every specific period in the schedule.
+_CATCH_ALL_WINDOW = (0, 23 * 60 + 59)
 
 # Fallback work modes, used only if the API response omits
 # properties.workmode.enumList. Kept as a superset of every mode seen in
@@ -262,16 +266,19 @@ class FoxessHapaApiClient:
         real_time = await self.async_get_real_time_data()
         scheduler_groups = None
         work_mode_options = None
+        scheduler_properties = None
         if device_info.has_battery:
             schedule = await self.async_get_scheduler()
             scheduler_groups = self._filter_active_groups(schedule.get("groups", []))
             work_mode_options = self._extract_work_mode_options(schedule)
+            scheduler_properties = self._extract_properties(schedule)
 
         return {
             "device_info": device_info,
             "real_time": real_time,
             "scheduler_groups": scheduler_groups,
             "work_mode_options": work_mode_options,
+            "scheduler_properties": scheduler_properties,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -436,6 +443,42 @@ class FoxessHapaApiClient:
         return list(DEFAULT_WORK_MODE_OPTIONS)
 
     @staticmethod
+    def _extract_properties(schedule: dict[str, Any]) -> dict[str, Any]:
+        """
+        Get the per-field metadata block from a scheduler response.
+
+        Devices return these keys fully lowercased (``fdpwr``, not ``fdPwr``),
+        unlike the camelCase used everywhere else in the API.
+        """
+        properties = schedule.get("properties")
+        return properties if isinstance(properties, dict) else {}
+
+    @staticmethod
+    def property_range(
+        properties: dict[str, Any] | None,
+        field: str,
+    ) -> tuple[float, float] | None:
+        """
+        Get the device-reported (min, max) for a scheduler field.
+
+        Returns None when the device does not report a range for the field --
+        ``reactivepowerenable``, for instance, carries no ``range`` at all --
+        so callers must be prepared to fall back to their own bounds.
+        """
+        if not properties:
+            return None
+        entry = properties.get(field.lower())
+        if not isinstance(entry, dict):
+            return None
+        value_range = entry.get("range")
+        if not isinstance(value_range, dict):
+            return None
+        minimum, maximum = value_range.get("min"), value_range.get("max")
+        if minimum is None or maximum is None:
+            return None
+        return float(minimum), float(maximum)
+
+    @staticmethod
     def minimal_group(group: dict[str, Any]) -> dict[str, Any]:
         """Extract minimal required fields from a group for v2 API updates."""
         result: dict[str, Any] = {
@@ -451,23 +494,58 @@ class FoxessHapaApiClient:
         return result
 
     @staticmethod
-    def find_current_period_index(groups: list[dict[str, Any]]) -> int | None:
-        """Find the index of the schedule period that covers the current time."""
+    def group_window(group: dict[str, Any]) -> tuple[int, int]:
+        """Return a group's (start, end) as minutes past midnight."""
+        start = group.get("startHour", 0) * 60 + group.get("startMinute", 0)
+        end = group.get("endHour", 23) * 60 + group.get("endMinute", 59)
+        return start, end
+
+    @classmethod
+    def is_catch_all(cls, group: dict[str, Any]) -> bool:
+        """Whether a group is a full-day 00:00-23:59 catch-all period."""
+        return cls.group_window(group) == _CATCH_ALL_WINDOW
+
+    @classmethod
+    def find_current_period_index(cls, groups: list[dict[str, Any]]) -> int | None:
+        """
+        Find the index of the schedule period governing the current time.
+
+        Schedules routinely contain an overlapping 00:00-23:59 catch-all (the
+        FoxESS app's "remaining time slots" default). Returning it would mask the
+        specific period actually in force, so catch-alls are considered only when
+        no specific period matches. Where several specific periods overlap, the
+        narrowest wins; ties go to the earliest.
+        """
         now = datetime.now().astimezone()
         current_minutes = now.hour * 60 + now.minute
 
+        specific: list[tuple[int, int]] = []
+        catch_all: int | None = None
+
         for i, group in enumerate(groups):
-            start_minutes = group.get("startHour", 0) * 60 + group.get("startMinute", 0)
-            end_minutes = group.get("endHour", 23) * 60 + group.get("endMinute", 59)
+            start_minutes, end_minutes = cls.group_window(group)
 
             # Handle periods that span midnight
             if end_minutes < start_minutes:
-                if current_minutes >= start_minutes or current_minutes <= end_minutes:
-                    return i
+                if not (
+                    current_minutes >= start_minutes or current_minutes <= end_minutes
+                ):
+                    continue
+                duration = _MINUTES_PER_DAY - start_minutes + end_minutes
             elif start_minutes <= current_minutes <= end_minutes:
-                return i
+                duration = end_minutes - start_minutes
+            else:
+                continue
 
-        return None
+            if cls.is_catch_all(group):
+                if catch_all is None:
+                    catch_all = i
+            else:
+                specific.append((duration, i))
+
+        if specific:
+            return min(specific)[1]
+        return catch_all
 
     @staticmethod
     def create_default_schedule_group(

@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from .api import DEFAULT_WORK_MODE_OPTIONS
+from .api import DEFAULT_WORK_MODE_OPTIONS, FoxessHapaApiClient
 from .const import DOMAIN, LOGGER
 
 if TYPE_CHECKING:
@@ -17,22 +17,42 @@ if TYPE_CHECKING:
 SERVICE_SET_SCHEDULE = "set_schedule"
 SERVICE_SET_SLOT = "set_slot"
 
-_VALID_WORK_MODES = DEFAULT_WORK_MODE_OPTIONS
+# Outer sanity bounds only. The device reports the real limits in the scheduler
+# `properties` block (fdPwr maxed at 10500 W on an H3, not the 6000 once assumed
+# here), and the supported work modes in properties.workmode.enumList, so both
+# are validated per-device at call time in _validate_against_device().
+_SOC_BOUNDS = vol.Range(min=0, max=100)
+_POWER_BOUNDS = vol.Range(min=0, max=100000)
+
+# extraParam fields settable through these services, mapped to their API names
+# and the `properties` key carrying the device's range for each.
+_EXTRA_PARAM_FIELDS: dict[str, str] = {
+    "min_soc": "minSocOnGrid",
+    "max_soc": "maxSoc",
+    "fd_soc": "fdSoc",
+    "fd_pwr": "fdPwr",
+}
+
+# Superseded names kept working for existing automations. `charge_to_soc` and
+# `charge_power` were misleading: fdSoc/fdPwr apply to Force *Charge* and Force
+# *Discharge* alike, so the neutral fd_soc/fd_pwr names replace them.
+_DEPRECATED_FIELD_ALIASES: dict[str, str] = {
+    "charge_to_soc": "fd_soc",
+    "charge_power": "fd_pwr",
+}
 
 _PERIOD_SCHEMA = vol.Schema(
     {
         vol.Required("start_time"): cv.string,
         vol.Required("end_time"): cv.string,
-        vol.Required("work_mode"): vol.In(_VALID_WORK_MODES),
+        vol.Required("work_mode"): cv.string,
         vol.Optional("enabled", default=True): cv.boolean,
-        vol.Optional("min_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
-        vol.Optional("max_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
-        vol.Optional("charge_to_soc"): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=100)
-        ),
-        vol.Optional("charge_power"): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=6000)
-        ),
+        vol.Optional("min_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("max_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("fd_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("fd_pwr"): vol.All(vol.Coerce(int), _POWER_BOUNDS),
+        vol.Optional("charge_to_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("charge_power"): vol.All(vol.Coerce(int), _POWER_BOUNDS),
     },
     extra=vol.REMOVE_EXTRA,
 )
@@ -53,16 +73,14 @@ SCHEMA_SET_SLOT = vol.Schema(
         vol.Required("slot"): vol.All(vol.Coerce(int), vol.Range(min=0, max=7)),
         vol.Optional("start_time"): cv.string,
         vol.Optional("end_time"): cv.string,
-        vol.Optional("work_mode"): vol.In(_VALID_WORK_MODES),
+        vol.Optional("work_mode"): cv.string,
         vol.Optional("enabled"): cv.boolean,
-        vol.Optional("min_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
-        vol.Optional("max_soc"): vol.All(vol.Coerce(int), vol.Range(min=10, max=100)),
-        vol.Optional("charge_to_soc"): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=100)
-        ),
-        vol.Optional("charge_power"): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=6000)
-        ),
+        vol.Optional("min_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("max_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("fd_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("fd_pwr"): vol.All(vol.Coerce(int), _POWER_BOUNDS),
+        vol.Optional("charge_to_soc"): vol.All(vol.Coerce(int), _SOC_BOUNDS),
+        vol.Optional("charge_power"): vol.All(vol.Coerce(int), _POWER_BOUNDS),
     }
 )
 
@@ -99,19 +117,76 @@ def _period_to_group(period: dict) -> dict:
         "workMode": period["work_mode"],
     }
 
-    extra_param: dict = {}
-    if "min_soc" in period:
-        extra_param["minSocOnGrid"] = period["min_soc"]
-    if "max_soc" in period:
-        extra_param["maxSoc"] = period["max_soc"]
-    if "charge_to_soc" in period:
-        extra_param["fdSoc"] = period["charge_to_soc"]
-    if "charge_power" in period:
-        extra_param["fdPwr"] = period["charge_power"]
+    extra_param = {
+        api_field: period[key]
+        for key, api_field in _EXTRA_PARAM_FIELDS.items()
+        if key in period
+    }
     if extra_param:
         group["extraParam"] = extra_param
 
     return group
+
+
+def _normalise_aliases(data: dict) -> dict:
+    """Rewrite superseded field names to their current equivalents."""
+    normalised = dict(data)
+    for old_key, new_key in _DEPRECATED_FIELD_ALIASES.items():
+        if old_key not in normalised:
+            continue
+        value = normalised.pop(old_key)
+        if new_key in normalised:
+            LOGGER.warning(
+                "Both %r and %r given; ignoring the deprecated %r",
+                old_key,
+                new_key,
+                old_key,
+            )
+            continue
+        LOGGER.warning(
+            "%r is deprecated, use %r instead (fdSoc/fdPwr apply to both Force "
+            "Charge and Force Discharge, so the 'charge' naming was misleading)",
+            old_key,
+            new_key,
+        )
+        normalised[new_key] = value
+    return normalised
+
+
+def _validate_against_device(data: dict, coordinator: Any) -> None:
+    """
+    Check work mode and numeric fields against what the device reports.
+
+    The device advertises its supported modes in properties.workmode.enumList
+    and per-field limits in properties.<field>.range. Both are device-specific,
+    so a static schema cannot police them: an H3 accepts fdPwr up to 10500 W but
+    rejects work modes such as PeakShaving that other models support.
+    """
+    device_data = coordinator.data or {}
+
+    work_mode = data.get("work_mode")
+    options = device_data.get("work_mode_options") or DEFAULT_WORK_MODE_OPTIONS
+    if work_mode is not None and work_mode not in options:
+        msg = (
+            f"Work mode {work_mode!r} is not supported by this device. "
+            f"Supported: {', '.join(options)}"
+        )
+        raise ServiceValidationError(msg)
+
+    properties = device_data.get("scheduler_properties")
+    for key, api_field in _EXTRA_PARAM_FIELDS.items():
+        if key not in data:
+            continue
+        bounds = FoxessHapaApiClient.property_range(properties, api_field)
+        if bounds is None:
+            continue
+        minimum, maximum = bounds
+        if not minimum <= data[key] <= maximum:
+            msg = (
+                f"{key} must be between {minimum:g} and {maximum:g} "
+                f"for this device (got {data[key]})"
+            )
+            raise ServiceValidationError(msg)
 
 
 def _get_client_and_coordinator(
@@ -139,7 +214,11 @@ async def _handle_set_schedule(call: ServiceCall) -> None:
         call.hass, data["config_entry_id"]
     )
 
-    groups = [_period_to_group(p) for p in data["periods"]]
+    periods = [_normalise_aliases(p) for p in data["periods"]]
+    for period in periods:
+        _validate_against_device(period, coordinator)
+
+    groups = [_period_to_group(p) for p in periods]
     LOGGER.info("set_schedule: sending %d period(s) to device", len(groups))
 
     try:
@@ -153,10 +232,11 @@ async def _handle_set_schedule(call: ServiceCall) -> None:
 
 async def _handle_set_slot(call: ServiceCall) -> None:
     """Handle foxess_hapa.set_slot service call."""
-    data = SCHEMA_SET_SLOT(dict(call.data))
+    data = _normalise_aliases(SCHEMA_SET_SLOT(dict(call.data)))
     client, coordinator = _get_client_and_coordinator(
         call.hass, data["config_entry_id"]
     )
+    _validate_against_device(data, coordinator)
     slot_idx: int = data["slot"]
 
     try:
@@ -189,14 +269,13 @@ async def _handle_set_slot(call: ServiceCall) -> None:
 
     # Merge extraParam fields into existing params
     extra_param = dict(groups[slot_idx].get("extraParam", {}))
-    if "min_soc" in data:
-        extra_param["minSocOnGrid"] = data["min_soc"]
-    if "max_soc" in data:
-        extra_param["maxSoc"] = data["max_soc"]
-    if "charge_to_soc" in data:
-        extra_param["fdSoc"] = data["charge_to_soc"]
-    if "charge_power" in data:
-        extra_param["fdPwr"] = data["charge_power"]
+    extra_param.update(
+        {
+            api_field: data[key]
+            for key, api_field in _EXTRA_PARAM_FIELDS.items()
+            if key in data
+        }
+    )
     if extra_param:
         group["extraParam"] = extra_param
 

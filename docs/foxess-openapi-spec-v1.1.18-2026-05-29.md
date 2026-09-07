@@ -1,8 +1,8 @@
 # Fox ESS Cloud Platform Open API Documentation
 
-> **Snapshot Date:** 2026-01-11
+> **Snapshot Date:** 2026-09-07
 > **Source:** https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html
-> **API Version:** V1.1.9 (as of January 9, 2026)
+> **API Version:** V1.1.18 (as of May 29, 2026)
 
 ## Overview
 
@@ -165,12 +165,18 @@ Cannot use both simultaneously.
 - **Path:** `/op/v0/device/report/statistic`
 - **Method:** POST
 - **Similar to production report with aggregated statistics**
+- ⚠️ **No longer documented as of V1.1.18.** Present in V1.1.9, absent from the
+  current published docs with no changelog entry. It may still function — treat as
+  undocumented rather than confirmed-removed.
 
 #### Get Device Battery Real Data
 - **Path:** `/op/v0/device/battery/real/query`
 - **Method:** POST
 - **Body:** `sn`
 - **Response:** Battery capacity, remaining capacity, energy, SOC, SOH, backup info
+- ⚠️ **No longer documented as of V1.1.18.** Present in V1.1.9, absent from the
+  current published docs with no changelog entry. It may still function — treat as
+  undocumented rather than confirmed-removed.
 
 #### Get Device Power Generation
 - **Path:** `/op/v0/device/generation`
@@ -273,6 +279,35 @@ Cannot use both simultaneously.
 - **Method:** POST
 - **Body:** `sn`, `readerType`, `readerInfo` (IP and password)
 
+#### Get Device Fault History
+- **Path:** `/op/v0/device/fault/history`
+- **Method:** POST
+- **Response:** Historical faults with Unix timestamp (ms) of occurrence
+- **Added:** V1.1.13
+
+#### Display Sleep Settings
+**Get:**
+- **Path:** `/op/v0/device/displaySleep/get`
+- **Method:** POST
+
+**Set:**
+- **Path:** `/op/v0/device/displaySleep/set`
+- **Method:** POST
+- **Body:** Three time windows (`time{1|2|3}StartHour`/`StartMinute`,
+  `time{1|2|3}EndHour`/`EndMinute`) with enable flags
+
+#### Device Boarding Status
+**Get:**
+- **Path:** `/op/v0/device/boarding/status`
+- **Method:** GET
+- **Query Parameters:** `sn`
+- **Auth:** OAuth bearer token
+- **Added:** V1.1.11 (retrieve endpoint V1.1.15)
+
+**Set:**
+- **Path:** `/op/v0/device/boarding/status/set`
+- **Method:** POST
+
 #### Battery Heating Parameters
 
 **Get Heating Parameters:**
@@ -290,22 +325,140 @@ Cannot use both simultaneously.
 
 ### Scheduler Management
 
-#### Scheduler V2 (Latest)
+Four generations coexist. **V3 is current**; V2 remains supported and is what this
+integration uses today. V0 is deprecated.
+
+#### Scheduler V3 (Current — added in V1.1.10, 2026-02-06)
+
+**Get Time Segment Information:**
+- **Path:** `/op/v3/device/scheduler/get`
+- **Method:** POST
+- **Body:** `deviceSN`
+- **Response:**
+  - `enable` (string) - master switch state (0:off 1:on)
+  - `groups[]` - configured time segments (see field table below)
+  - `maxGroupCount` (number) - **maximum groups supported by this device**; do not
+    assume 8
+  - `properties` - per-field range metadata (see *Properties block* below)
+
+**Set Time Segment Information:**
+- **Path:** `/op/v3/device/scheduler/enable`
+- **Method:** POST
+- **Body:** `deviceSN`, `isDefault` (optional, default `false`), `groups[]`
+- **Response:** echoes `deviceSN`, `isDefault` and the accepted `groups[]` on success
+  (behaviour introduced in V1.1.12)
+
+**Batch Set Time Segment Information:**
+- **Path:** `/op/v3/device/scheduler/enable/batch`
+- **Method:** POST
+- **Body:** `deviceSNList[]` (max 50 devices), `groups[]`, `notifyChannel`
+  (`none` | `webhook`), `isDefault` (optional), `requestId` (optional idempotency
+  key, max 64 chars), `webhook` (optional `{url, secret}` override; URL must be HTTPS)
+- **Validation is all-or-nothing:** if any device is invalid/unauthorised or any
+  segment is invalid, the entire request is rejected and no task is submitted.
+- **Asynchronous:** returns `ACCEPTED` immediately with `requestId`, `total`,
+  `accepted`; it does not wait for devices to finish.
+- **Webhook signature:** read `X-Foxess-Timestamp`, `X-Foxess-Nonce`,
+  `X-Foxess-Signature`; sign `timestamp + "\n" + nonce + "\n" + rawBody` with
+  HMAC-SHA256 using the webhook secret, hex-encoded lowercase, compared
+  constant-time against the value after `sha256=`. Use `X-Foxess-Event-Id` for
+  idempotency.
+
+**Key differences from V2:**
+- V3 groups have **no per-group `enable` field** — the presence of a group in the
+  list is what makes it active. (V2 groups carry `enable` 0/1.)
+- `maxGroupCount` is reported by the device rather than fixed at 8.
+- Adds the batch endpoint and webhook completion notifications.
+
+---
+
+#### Scheduler V2
 
 **Get Time Segment Information:**
 - **Path:** `/op/v2/device/scheduler/get`
 - **Method:** POST
 - **Body:** `deviceSN`
-- **Response:** Master switch state, 8 configurable time groups with work modes and extended parameters
+- **Response:** `enable` (master switch), `groups[]`, `properties`
 
 **Set Time Segment Information:**
 - **Path:** `/op/v2/device/scheduler/enable`
 - **Method:** POST
-- **Body:** `deviceSN`, `isDefault` (optional, default false), `groups[]` with optional `extraParam` object
-- **Parameters per group:**
-  - `enable`, `startHour`, `startMinute`, `endHour`, `endMinute`
-  - `workMode` (SelfUse, Feedin, Backup, ForceCharge, ForceDischarge)
-  - `extraParam` (optional): `minSocOnGrid`, `fdSoc`, `fdPwr`, `maxSoc`, `importLimit`, `exportLimit`, `pvLimit`, `reactivePower`
+- **Body:** `deviceSN`, `isDefault` (optional, default `false`), `groups[]`
+
+---
+
+#### Scheduler group fields (V2 and V3)
+
+| Field | Type | Required | Note |
+|---|---|---|---|
+| `enable` | integer | V2 only | Whether this group is active (0:disable 1:enable). Not present in V3. |
+| `startHour` / `startMinute` | integer | Yes | Start time |
+| `endHour` / `endMinute` | integer | Yes | End time |
+| `workMode` | string | Yes | `SelfUse`, `Feedin`, `Backup`, `ForceCharge`, `ForceDischarge` |
+| `extraParam` | object | No | See below |
+
+**`extraParam` fields** (all optional on write):
+
+| Field | Meaning |
+|---|---|
+| `minSocOnGrid` | Battery discharge cut-off SoC in grid-connected state |
+| `fdSoc` | **FC/FD SoC.** The SoC level for Force Charge *or* Force Discharge mode. Once the battery reaches this SoC the system automatically stops charging or discharging. |
+| `fdPwr` | **FC/FD Power.** Maximum charging *or* discharging power in Force Charge / Force Discharge mode: the max AC input power drawn from grid when force charging, and the max AC output power delivered when force discharging. |
+| `maxSoc` | Max SoC value |
+| `importLimit` | Import limit |
+| `exportLimit` | Export limit |
+| `pvLimit` | PV limit |
+| `reactivePower` | Reactive power limit |
+
+> **Note:** `fdSoc` and `fdPwr` are **not discharge-only**. The official
+> descriptions cover both Force Charge and Force Discharge, so naming them as
+> "charge" or "discharge" parameters is misleading in one direction or the other.
+
+#### `isDefault` — merge vs. reset semantics
+
+`isDefault` controls what happens to `extraParam` fields you do **not** send:
+
+- `false` (default) — parameters not provided in `extraParam` **remain unchanged**.
+- `true` — parameters not provided in `extraParam` are **restored to system defaults**.
+
+This is documented identically for V2 and V3. Sending a partial `extraParam` with
+`isDefault: false` is therefore a safe partial update; it does not clobber the
+fields you omitted.
+
+#### Properties block
+
+Both V2 and V3 `get` responses include a `properties` object giving the valid
+**range for each field** in a group time period, keyed by field name:
+
+```
+properties.{field_name} = {
+  unit:      string,
+  precision: 1 | 0.1 | 0.01,
+  range:     { min: number, max: number }
+}
+```
+
+Use this to derive entity ranges (e.g. the real `fdPwr` maximum, which is
+inverter-dependent) rather than hardcoding limits.
+
+> **Observed vs. documented (verified against an H3 device, 2026-09-07):**
+>
+> - **Keys are returned fully lowercased** — `fdpwr`, `fdsoc`, `minsocongrid`,
+>   `maxsoc`, `workmode`, `starthour` … — *not* the camelCase used everywhere
+>   else in the API. Look up `properties["fdpwr"]`, not `properties["fdPwr"]`.
+> - **`workmode` carries an undocumented `enumList`** giving the modes the
+>   device actually accepts. The published docs list five modes; a real device
+>   returned seven, including `ForceCharge(BAT)` and `ForceDischarge(BAT)`:
+>   `["ForceDischarge", "Feedin", "ForceCharge(BAT)", "ForceDischarge(BAT)",
+>   "Backup", "SelfUse", "ForceCharge"]`. Prefer `enumList` over any static list.
+> - **`range` is not always present.** `reactivepowerenable` returned `precision`
+>   and `unit` but no `range`. Handle its absence.
+> - **Ranges are device-specific.** The same H3 reported `fdpwr` max **10500 W**
+>   (not the 6000 often assumed), `fdsoc`/`maxsoc`/`minsocongrid` 10–100 %,
+>   `pvlimit` 0–20000 W, `reactivepower` ±6000 Var, `importlimit`/`exportlimit`
+>   0–100000 W. Always read them rather than hardcoding.
+> - **`maxGroupCount` is V3-only** and was **96** on this device — V2's response
+>   omits the field entirely.
 
 ---
 
@@ -333,8 +486,9 @@ Cannot use both simultaneously.
 - **Method:** POST
 - **Body:** `deviceSN`, `groups[]` with parameters:
   - `enable`, `startHour`, `startMinute`, `endHour`, `endMinute`
-  - `workMode`, `minSocOnGrid` (10-100), `fdSoc`, `fdPwr` (0-6000)
-  - `maxSoc` (optional, for V1)
+  - `workMode`, `minSocOnGrid` (10-100), `fdSoc`, `fdPwr`
+  - `maxSoc` (optional, added in V1.0.10)
+- **Note:** V1 carries the SOC/power fields flat on the group, not under `extraParam`.
 
 ---
 
@@ -356,6 +510,9 @@ Cannot use both simultaneously.
 - **Path:** `/op/v0/device/scheduler/set/flag`
 - **Method:** POST
 - **Body:** `deviceSN`, `enable` (0/1)
+- ⚠️ **Source inconsistency:** the endpoint listing gives `/op/v0/device/scheduler/set/flag`,
+  but the Python sample in the same doc (`device_scheduler_set_flag()`) posts to
+  `/op/v0/device/scheduler/set`. Verify against the device if you use V0.
 
 **Set Time Segment Information (DEPRECATED):**
 - **Path:** `/op/v0/device/scheduler/enable`
@@ -378,6 +535,21 @@ Cannot use both simultaneously.
 - **Body:** `currentPage`, `pageSize` (10-1000)
 - **Response:** Paginated list with SN, station ID, status (1 online/2 offline), signal strength (0-100), version info
 
+#### Get Data Logger Details
+- **Path:** `/op/v0/module/detail`
+- **Method:** GET
+- **Response:** Includes `webVersion`, `softVersion`
+- **Added:** V1.1.11
+
+#### Get Data Logger LAN Info
+- **Path:** `/op/v0/module/getLanInfo`
+- **Method:** POST
+- **Response:** IP, `gateway`, `mask`
+
+#### Get Data Logger WiFi Info
+- **Path:** `/op/v0/module/getWifiInfo`
+- **Method:** POST
+
 #### Modbus Commands
 - **Path:** `/op/v0/module/modbus/commands`
 - **Method:** POST
@@ -387,6 +559,16 @@ Cannot use both simultaneously.
 ---
 
 ### EMS (Energy Management System)
+
+#### Get EMS Real-Time Data
+- **Path:** `/op/v0/ems/real/query`
+- **Method:** POST
+- **Added:** V1.1.10
+
+#### Get EMS History Data
+- **Path:** `/op/v0/ems/history/query`
+- **Method:** POST
+- **Added:** V1.1.10
 
 #### AC Output Control Setting
 
@@ -508,6 +690,16 @@ Cannot use both simultaneously.
 - **Body:** `currentPage`, `pageSize`, `sn`
 - **Response:** Heat SN, module SN, register status, running status (1 online/2 fault/3 offline), version, device type
 
+#### Heat Pump Controls (V1.1.18)
+Four get/set control groups, each `POST`:
+
+| Control group | Get | Set |
+|---|---|---|
+| Generic | `/op/v0/heat/genericControls/get` | `/op/v0/heat/genericControls/set` |
+| Heating | `/op/v0/heat/heatingControls/get` | `/op/v0/heat/heatingControls/set` |
+| Heating circuits | `/op/v0/heat/heatingCircuitsControls/get` | `/op/v0/heat/heatingCircuitsControls/set` |
+| DHW (hot water) | `/op/v0/heat/dhwControls/get` | `/op/v0/heat/dhwControls/set` |
+
 #### Heat Pump Register Status Change
 - **Path:** `/op/v0/heat/register/status/change`
 - **Method:** POST
@@ -554,6 +746,11 @@ Cannot use both simultaneously.
 - **Path:** `/op/v0/user/getAccessCount`
 - **Method:** GET
 - **Response:** `total` (total allowed calls), `remaining` (available calls)
+
+#### VPP OAuth 2.0 Client Onboarding
+- **Onboard:** `POST /op/v0/vpp/oauth2/client/onboard`
+- **Offboard:** `POST /op/v0/vpp/oauth2/client/offboard`
+- **Device offboard:** `POST /op/v0/vpp/oauth2/code/offboard/device`
 
 #### Installer Device Count
 - **Path:** `/op/v0/device/installer/count`
@@ -627,3 +824,12 @@ All variables include multilingual names (zh_CN, en, de, pt, fr, pl) and units.
 | 2025/10/31 | V1.1.7 | MicroStorage LCD, ecomode, EMS |
 | 2025/11/28 | V1.1.8 | GMAX enhancements |
 | 2026/01/09 | V1.1.9 | AI Link/EMS settings, collector version |
+| 2026/02/06 | V1.1.10 | EMS real-time and history query interfaces; **Scheduler V3** |
+| 2026/03/09 | V1.1.11 | Boarding status; Data Logger Details endpoint |
+| 2026/03/20 | V1.1.12 | Device param setting APIs echo input on success; GMAX peak time params constrained |
+| 2026/04/02 | V1.1.13 | Device fault history endpoint; `PVEnergyTotal` added to real-time data |
+| 2026/04/03 | V1.1.14 | Kafka integration documentation |
+| 2026/04/29 | V1.1.15 | Device boarding status retrieve endpoint; new data variables |
+| 2026/05/07 | V1.1.16 | OAuth guide updated |
+| 2026/05/22 | V1.1.17 | Battery information added to plant details endpoint (US only) |
+| 2026/05/29 | V1.1.18 | Heat pump endpoints; variable table updated |
