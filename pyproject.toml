@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pip>=21.3.1",
-    "ruff==0.15.19",
+    "ruff==0.16.6",
 ]
 
 [tool.ruff]
@@ -39,6 +39,7 @@ ignore = [
     "D212", # multi-line-summary-first-line (incompatible with formatter)
     "COM812", # incompatible with formatter
     "ISC001", # incompatible with formatter
+    "CPY001", # Missing copyright notice at top of file (not used in this project)
 ]
 
 [tool.ruff.lint.flake8-pytest-style]
