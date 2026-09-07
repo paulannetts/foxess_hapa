@@ -23,6 +23,22 @@
             "schedule_summary": {
                 "name": "Schedule"
             }
+        },
+        "number": {
+            "min_soc_on_grid": {
+                "name": "Min SoC On Grid"
+            },
+            "fd_soc": {
+                "name": "Force Charge/Discharge SoC"
+            },
+            "fd_pwr": {
+                "name": "Force Charge/Discharge Power"
+            }
+        },
+        "select": {
+            "work_mode": {
+                "name": "Work Mode"
+            }
         }
     }
 }

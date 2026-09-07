@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .api import (
-    DEFAULT_WORK_MODE_OPTIONS,
     FoxessDeviceInfo,
     FoxessHapaApiClient,
     FoxessRealTimeData,
@@ -21,6 +20,19 @@ _MORNING_END = 9
 _DAY_END = 17
 _EVENING_END = 22
 _MAX_SOC = 100
+
+# Scheduler metadata mirroring a real H3 response
+_MOCK_WORK_MODES = [
+    "SelfUse",
+    "Feedin",
+    "Backup",
+    "ForceCharge",
+    "ForceDischarge",
+    "ForceCharge(BAT)",
+    "ForceDischarge(BAT)",
+]
+_MOCK_SOC_RANGE = {"min": 10.0, "max": 100.0}
+_MOCK_POWER_RANGE = {"min": 0.0, "max": 10500.0}
 
 
 class MockFoxessHapaApiClient(FoxessHapaApiClient):
@@ -167,12 +179,14 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         schedule = await self.async_get_scheduler()
         scheduler_groups = self._filter_active_groups(schedule.get("groups", []))
         work_mode_options = self._extract_work_mode_options(schedule)
+        scheduler_properties = self._extract_properties(schedule)
 
         return {
             "device_info": device_info,
             "real_time": real_time,
             "scheduler_groups": scheduler_groups,
             "work_mode_options": work_mode_options,
+            "scheduler_properties": scheduler_properties,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -270,8 +284,18 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         return {
             "enable": True,
             "groups": self._schedule_groups,
+            # Shaped like a real device response: lowercased keys, per-field
+            # ranges, and a workmode enumList narrower than our static fallback.
             "properties": {
-                "workmode": {"enumList": DEFAULT_WORK_MODE_OPTIONS},
+                "workmode": {"enumList": _MOCK_WORK_MODES},
+                "fdpwr": {"unit": "W", "precision": 1.0, "range": _MOCK_POWER_RANGE},
+                "fdsoc": {"unit": "%", "precision": 1.0, "range": _MOCK_SOC_RANGE},
+                "maxsoc": {"unit": "%", "precision": 1.0, "range": _MOCK_SOC_RANGE},
+                "minsocongrid": {
+                    "unit": "%",
+                    "precision": 1.0,
+                    "range": _MOCK_SOC_RANGE,
+                },
             },
         }
 

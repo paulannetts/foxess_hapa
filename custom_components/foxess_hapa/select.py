@@ -107,7 +107,7 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
 
         client = self.coordinator.config_entry.runtime_data.client
         try:
-            groups = await client.async_get_schedule_groups()
+            groups = await client.async_get_schedule_groups(active_only=False)
 
             if not groups:
                 # Create a default schedule period if none exists
@@ -130,7 +130,7 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
                     for i, g in enumerate(groups)
                 ]
 
-            success = await client.async_set_scheduler(groups, enable=True)
+            success = await client.async_set_scheduler(groups, enable=True, pad=False)
 
             if success:
                 LOGGER.info("Successfully set work mode to %s", option)

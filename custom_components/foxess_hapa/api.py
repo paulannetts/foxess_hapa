@@ -16,6 +16,10 @@ import async_timeout
 from .const import LOGGER
 
 _SCHEDULE_SLOT_COUNT = 8
+_MINUTES_PER_DAY = 24 * 60
+# A group running 00:00-23:59 is the FoxESS app's "remaining time slots"
+# catch-all, which overlaps every specific period in the schedule.
+_CATCH_ALL_WINDOW = (0, 23 * 60 + 59)
 
 # Fallback work modes, used only if the API response omits
 # properties.workmode.enumList. Kept as a superset of every mode seen in
@@ -262,16 +266,19 @@ class FoxessHapaApiClient:
         real_time = await self.async_get_real_time_data()
         scheduler_groups = None
         work_mode_options = None
+        scheduler_properties = None
         if device_info.has_battery:
             schedule = await self.async_get_scheduler()
             scheduler_groups = self._filter_active_groups(schedule.get("groups", []))
             work_mode_options = self._extract_work_mode_options(schedule)
+            scheduler_properties = self._extract_properties(schedule)
 
         return {
             "device_info": device_info,
             "real_time": real_time,
             "scheduler_groups": scheduler_groups,
             "work_mode_options": work_mode_options,
+            "scheduler_properties": scheduler_properties,
         }
 
     async def async_get_device_detail(self) -> FoxessDeviceInfo:
@@ -407,25 +414,50 @@ class FoxessHapaApiClient:
         )
         return result.get("result", {})
 
-    async def async_get_schedule_groups(self) -> list[dict[str, Any]]:
-        """Get scheduler groups, filtering out disabled and zero-duration ones."""
+    async def async_get_schedule_groups(
+        self,
+        *,
+        active_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        """
+        Get scheduler groups.
+
+        Reads default to active groups only, so disabled placeholders do not
+        surface as real periods. Writes should pass active_only=False and send
+        the device's full list back: a partial update built from a filtered list
+        loses the device's disabled slots, and padding then recreates them as
+        generic placeholders.
+        """
         schedule = await self.async_get_scheduler()
-        return self._filter_active_groups(schedule.get("groups", []))
+        groups = schedule.get("groups", [])
+        return self._filter_active_groups(groups) if active_only else list(groups)
 
     @staticmethod
+    def is_active_group(group: dict[str, Any]) -> bool:
+        """Whether a group is enabled and covers a non-zero span of time."""
+        return group.get("enable", 1) != 0 and not (
+            group.get("startHour") == group.get("endHour")
+            and group.get("startMinute") == group.get("endMinute")
+        )
+
+    @classmethod
     def _filter_active_groups(
+        cls,
         groups: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Filter out disabled and zero-duration schedule groups."""
-        return [
-            g
-            for g in groups
-            if g.get("enable", 1) != 0
-            and not (
-                g.get("startHour") == g.get("endHour")
-                and g.get("startMinute") == g.get("endMinute")
-            )
-        ]
+        return [g for g in groups if cls.is_active_group(g)]
+
+    @classmethod
+    def active_group_indices(cls, groups: list[dict[str, Any]]) -> list[int]:
+        """
+        Map active-period position to index in the full group list.
+
+        Services address slots by their position among active periods, which is
+        what users see; writes need the corresponding index in the device's full
+        list so untouched slots survive.
+        """
+        return [i for i, g in enumerate(groups) if cls.is_active_group(g)]
 
     @staticmethod
     def _extract_work_mode_options(schedule: dict[str, Any]) -> list[str]:
@@ -434,6 +466,42 @@ class FoxessHapaApiClient:
         if enum_list:
             return list(enum_list)
         return list(DEFAULT_WORK_MODE_OPTIONS)
+
+    @staticmethod
+    def _extract_properties(schedule: dict[str, Any]) -> dict[str, Any]:
+        """
+        Get the per-field metadata block from a scheduler response.
+
+        Devices return these keys fully lowercased (``fdpwr``, not ``fdPwr``),
+        unlike the camelCase used everywhere else in the API.
+        """
+        properties = schedule.get("properties")
+        return properties if isinstance(properties, dict) else {}
+
+    @staticmethod
+    def property_range(
+        properties: dict[str, Any] | None,
+        field: str,
+    ) -> tuple[float, float] | None:
+        """
+        Get the device-reported (min, max) for a scheduler field.
+
+        Returns None when the device does not report a range for the field --
+        ``reactivepowerenable``, for instance, carries no ``range`` at all --
+        so callers must be prepared to fall back to their own bounds.
+        """
+        if not properties:
+            return None
+        entry = properties.get(field.lower())
+        if not isinstance(entry, dict):
+            return None
+        value_range = entry.get("range")
+        if not isinstance(value_range, dict):
+            return None
+        minimum, maximum = value_range.get("min"), value_range.get("max")
+        if minimum is None or maximum is None:
+            return None
+        return float(minimum), float(maximum)
 
     @staticmethod
     def minimal_group(group: dict[str, Any]) -> dict[str, Any]:
@@ -451,23 +519,63 @@ class FoxessHapaApiClient:
         return result
 
     @staticmethod
-    def find_current_period_index(groups: list[dict[str, Any]]) -> int | None:
-        """Find the index of the schedule period that covers the current time."""
+    def group_window(group: dict[str, Any]) -> tuple[int, int]:
+        """Return a group's (start, end) as minutes past midnight."""
+        start = group.get("startHour", 0) * 60 + group.get("startMinute", 0)
+        end = group.get("endHour", 23) * 60 + group.get("endMinute", 59)
+        return start, end
+
+    @classmethod
+    def is_catch_all(cls, group: dict[str, Any]) -> bool:
+        """Whether a group is a full-day 00:00-23:59 catch-all period."""
+        return cls.group_window(group) == _CATCH_ALL_WINDOW
+
+    @classmethod
+    def find_current_period_index(cls, groups: list[dict[str, Any]]) -> int | None:
+        """
+        Find the index of the schedule period governing the current time.
+
+        Schedules routinely contain an overlapping 00:00-23:59 catch-all (the
+        FoxESS app's "remaining time slots" default). Returning it would mask the
+        specific period actually in force, so catch-alls are considered only when
+        no specific period matches. Where several specific periods overlap, the
+        narrowest wins; ties go to the earliest.
+        """
         now = datetime.now().astimezone()
         current_minutes = now.hour * 60 + now.minute
 
+        specific: list[tuple[int, int]] = []
+        catch_all: int | None = None
+
         for i, group in enumerate(groups):
-            start_minutes = group.get("startHour", 0) * 60 + group.get("startMinute", 0)
-            end_minutes = group.get("endHour", 23) * 60 + group.get("endMinute", 59)
+            # Callers may pass the device's full list, which includes disabled
+            # and zero-duration placeholders; those never govern.
+            if not cls.is_active_group(group):
+                continue
+
+            start_minutes, end_minutes = cls.group_window(group)
 
             # Handle periods that span midnight
             if end_minutes < start_minutes:
-                if current_minutes >= start_minutes or current_minutes <= end_minutes:
-                    return i
+                if not (
+                    current_minutes >= start_minutes or current_minutes <= end_minutes
+                ):
+                    continue
+                duration = _MINUTES_PER_DAY - start_minutes + end_minutes
             elif start_minutes <= current_minutes <= end_minutes:
-                return i
+                duration = end_minutes - start_minutes
+            else:
+                continue
 
-        return None
+            if cls.is_catch_all(group):
+                if catch_all is None:
+                    catch_all = i
+            else:
+                specific.append((duration, i))
+
+        if specific:
+            return min(specific)[1]
+        return catch_all
 
     @staticmethod
     def create_default_schedule_group(
@@ -492,17 +600,24 @@ class FoxessHapaApiClient:
         periods: list[dict[str, Any]],
         *,
         enable: bool = True,
+        pad: bool = True,
     ) -> bool:
         """
         Set scheduler settings (for minSoC and work mode changes).
 
         This is the main write endpoint for changing battery settings
         and work modes on FoxESS inverters.
+
+        Padding to a full slot count clears any slots the caller omitted, rather
+        than letting the API fill the gaps unpredictably, so it suits a full
+        replace. Partial updates must pass pad=False and supply the device's
+        whole group list; otherwise the placeholders overwrite slots the caller
+        never intended to touch.
         """
-        # Pad to exactly _SCHEDULE_SLOT_COUNT with disabled zero-duration groups
         padded = list(periods)
-        while len(padded) < _SCHEDULE_SLOT_COUNT:
-            padded.append(dict(_PLACEHOLDER_GROUP))
+        if pad:
+            while len(padded) < _SCHEDULE_SLOT_COUNT:
+                padded.append(dict(_PLACEHOLDER_GROUP))
 
         path = "/op/v2/device/scheduler/enable"
         data = {

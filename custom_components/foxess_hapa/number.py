@@ -11,7 +11,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfPower
 
 from .const import LOGGER
 from .entity import FoxessHapaEntity
@@ -34,8 +34,13 @@ class FoxessHapaNumberEntityDescription(NumberEntityDescription):
 # Map entity value_attr to scheduler API field names (v2 uses extraParam)
 FIELD_MAPPING: dict[str, str] = {
     "min_soc_on_grid": "minSocOnGrid",
+    "fd_soc": "fdSoc",
+    "fd_pwr": "fdPwr",
 }
 
+# The min/max below are fallbacks only. Devices report their real limits in the
+# scheduler `properties` block -- an H3 allows fdPwr up to 10500 W -- so
+# native_min_value/native_max_value prefer those when available.
 NUMBER_DESCRIPTIONS: tuple[FoxessHapaNumberEntityDescription, ...] = (
     FoxessHapaNumberEntityDescription(
         key="min_soc_on_grid",
@@ -49,6 +54,32 @@ NUMBER_DESCRIPTIONS: tuple[FoxessHapaNumberEntityDescription, ...] = (
         mode=NumberMode.SLIDER,
         icon="mdi:battery-charging-low",
         value_attr="min_soc_on_grid",
+    ),
+    FoxessHapaNumberEntityDescription(
+        key="fd_soc",
+        translation_key="fd_soc",
+        name="Force Charge/Discharge SoC",
+        native_min_value=10,
+        native_max_value=100,
+        native_step=1,
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=NumberDeviceClass.BATTERY,
+        mode=NumberMode.SLIDER,
+        icon="mdi:battery-arrow-down",
+        value_attr="fd_soc",
+    ),
+    FoxessHapaNumberEntityDescription(
+        key="fd_pwr",
+        translation_key="fd_pwr",
+        name="Force Charge/Discharge Power",
+        native_min_value=0,
+        native_max_value=10500,
+        native_step=1,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=NumberDeviceClass.POWER,
+        mode=NumberMode.BOX,
+        icon="mdi:transmission-tower-export",
+        value_attr="fd_pwr",
     ),
 )
 
@@ -92,6 +123,37 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
         )
 
     @property
+    def _api_field(self) -> str | None:
+        """Scheduler extraParam field this entity maps to."""
+        return FIELD_MAPPING.get(self.entity_description.value_attr)
+
+    @property
+    def _device_range(self) -> tuple[float, float] | None:
+        """Device-reported (min, max) for this field, if it reports one."""
+        if not self.coordinator.data or not self._api_field:
+            return None
+        client = self.coordinator.config_entry.runtime_data.client
+        return client.property_range(
+            self.coordinator.data.get("scheduler_properties"), self._api_field
+        )
+
+    @property
+    def native_min_value(self) -> float:
+        """Minimum accepted by this device, falling back to the description."""
+        device_range = self._device_range
+        if device_range is None:
+            return self.entity_description.native_min_value
+        return device_range[0]
+
+    @property
+    def native_max_value(self) -> float:
+        """Maximum accepted by this device, falling back to the description."""
+        device_range = self._device_range
+        if device_range is None:
+            return self.entity_description.native_max_value
+        return device_range[1]
+
+    @property
     def native_value(self) -> float | None:
         """Return the current value from scheduler data."""
         if not self.coordinator.data:
@@ -107,8 +169,7 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
             return None
 
         extra_param = groups[current_idx].get("extraParam", {})
-        api_field = FIELD_MAPPING.get(self.entity_description.value_attr)
-        return extra_param.get(api_field)
+        return extra_param.get(self._api_field)
 
     async def async_set_native_value(self, value: float) -> None:
         """
@@ -126,9 +187,9 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
 
         client = self.coordinator.config_entry.runtime_data.client
         try:
-            groups = await client.async_get_schedule_groups()
+            groups = await client.async_get_schedule_groups(active_only=False)
 
-            api_field = FIELD_MAPPING.get(self.entity_description.value_attr)
+            api_field = self._api_field
             if not api_field:
                 LOGGER.error("Unknown field: %s", self.entity_description.value_attr)
                 return
@@ -152,18 +213,22 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
                     )
                     return
 
-                # Update only the current period, preserve others
+                # Update only the current period, preserving the other extraParam
+                # values on it, and leave every other period untouched.
                 groups = [
                     {
                         **client.minimal_group(g),
-                        "extraParam": {api_field: int(value)},
+                        "extraParam": {
+                            **g.get("extraParam", {}),
+                            api_field: int(value),
+                        },
                     }
                     if i == current_idx
                     else client.minimal_group(g)
                     for i, g in enumerate(groups)
                 ]
 
-            success = await client.async_set_scheduler(groups, enable=True)
+            success = await client.async_set_scheduler(groups, enable=True, pad=False)
 
             if success:
                 LOGGER.info(
