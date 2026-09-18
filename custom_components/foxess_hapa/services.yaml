@@ -1,11 +1,17 @@
 set_schedule:
   name: Set Schedule
   description: Replace the full battery charge schedule with a new set of time periods.
+  target:
+    device:
+      integration: foxess_hapa
   fields:
     config_entry_id:
-      name: Device
-      description: The FoxESS device to update.
-      required: true
+      name: Config entry (deprecated)
+      description: >
+        Deprecated - pick the device under "Targets" instead. Kept so existing
+        automations that pass a config entry ID keep working.
+      required: false
+      advanced: true
       selector:
         config_entry:
           integration: foxess_hapa
@@ -13,17 +19,16 @@ set_schedule:
       name: Periods
       description: >
         List of 1–8 schedule periods. Each period must have start_time, end_time,
-        and work_mode. min_soc, max_soc, fd_soc and fd_pwr are optional.
-        Supported work modes vary by device and are validated against the
-        device's own list; fd_soc/fd_pwr are validated against its reported
-        ranges.
+        and work_mode. target_soc (sets min_soc and fd_soc together), min_soc,
+        max_soc, fd_soc and fd_pwr are optional. Supported work modes vary by
+        device and are validated against the device's own list; SoC and power
+        fields are validated against its reported ranges.
       required: true
       example:
         - start_time: "00:00"
           end_time: "03:30"
           work_mode: ForceCharge
-          min_soc: 10
-          max_soc: 90
+          target_soc: 90
         - start_time: "03:30"
           end_time: "23:59"
           work_mode: SelfUse
@@ -34,11 +39,17 @@ set_schedule:
 set_slot:
   name: Set Slot
   description: Update a single schedule slot by index, preserving all other slots.
+  target:
+    device:
+      integration: foxess_hapa
   fields:
     config_entry_id:
-      name: Device
-      description: The FoxESS device to update.
-      required: true
+      name: Config entry (deprecated)
+      description: >
+        Deprecated - pick the device under "Targets" instead. Kept so existing
+        automations that pass a config entry ID keep working.
+      required: false
+      advanced: true
       selector:
         config_entry:
           integration: foxess_hapa
@@ -85,6 +96,111 @@ set_slot:
       description: Whether this slot is active.
       selector:
         boolean:
+    target_soc:
+      name: Target SoC
+      description: >
+        Sets Min SoC and Force charge/discharge SoC together: the floor in
+        SelfUse/ForceDischarge and the level ForceCharge charges up to. Cannot
+        be combined with min_soc or fd_soc.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    min_soc:
+      name: Min SoC
+      description: Minimum battery state of charge (%) on grid power.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    max_soc:
+      name: Max SoC
+      description: Maximum battery state of charge (%) to charge to.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    fd_soc:
+      name: Force charge/discharge SoC
+      description: >
+        SoC at which Force Charge or Force Discharge stops (the FoxESS app calls
+        this "Discharging Cut-off SoC" on a discharge slot). Applies to both force
+        modes. Device-specific range; commonly 10-100%.
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: box
+    fd_pwr:
+      name: Force charge/discharge power
+      description: >
+        Maximum power for Force Charge or Force Discharge (the FoxESS app calls
+        this "Discharge Power to Grid" on a discharge slot). Device-specific
+        maximum - an H3 reports 10500 W - and validated against the device.
+      selector:
+        number:
+          min: 0
+          max: 100000
+          unit_of_measurement: "W"
+          mode: box
+
+set_current_period:
+  name: Set Current Period
+  description: >
+    Update the schedule period covering the current time - the one the Work
+    Mode select and Target SoC number act on - applying every given field in a
+    single scheduler write. Use this to change work mode and SoC target
+    together without a moment where only one has taken effect.
+  target:
+    device:
+      integration: foxess_hapa
+  fields:
+    config_entry_id:
+      name: Config entry (deprecated)
+      description: >
+        Deprecated - pick the device under "Targets" instead. Kept so existing
+        automations that pass a config entry ID keep working.
+      required: false
+      advanced: true
+      selector:
+        config_entry:
+          integration: foxess_hapa
+    work_mode:
+      name: Work mode
+      description: Battery work mode for this slot.
+      selector:
+        select:
+          custom_value: true
+          options:
+            - SelfUse
+            - Feedin
+            - Backup
+            - ForceCharge
+            - ForceDischarge
+            - ForceCharge(BAT)
+            - ForceDischarge(BAT)
+            - ForceCharge(AC)
+            - ForceDischarge(AC)
+            - PeakShaving
+    target_soc:
+      name: Target SoC
+      description: >
+        Sets Min SoC and Force charge/discharge SoC together: the floor in
+        SelfUse/ForceDischarge and the level ForceCharge charges up to. Cannot
+        be combined with min_soc or fd_soc.
+      selector:
+        number:
+          min: 10
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
     min_soc:
       name: Min SoC
       description: Minimum battery state of charge (%) on grid power.

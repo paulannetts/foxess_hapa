@@ -83,6 +83,30 @@ A Home Assistant custom component for FoxESS inverters using the FoxESS Cloud AP
 Controls act on the schedule period covering the current time. See
 [CHANGELOG.md](CHANGELOG.md) for entity and attribute renames between releases.
 
+### Services
+
+All services target the inverter as a device. Each call is a single scheduler
+write, so every field given lands together.
+
+- **`foxess_hapa.set_current_period`** - update the period covering the current
+  time (the one the controls above act on). Fields: `work_mode`, `target_soc`,
+  `min_soc`, `max_soc`, `fd_soc`, `fd_pwr`, all optional.
+- **`foxess_hapa.set_slot`** - update one period by its index among the active
+  periods; also accepts `start_time`, `end_time` and `enabled`.
+- **`foxess_hapa.set_schedule`** - replace the whole schedule with 1-8 periods.
+
+`target_soc` sets `min_soc` and `fd_soc` to the same value and cannot be
+combined with either. Example - force charge to 80% right now:
+
+```yaml
+action: foxess_hapa.set_current_period
+target:
+  device_id: <your inverter>
+data:
+  work_mode: ForceCharge
+  target_soc: 80
+```
+
 ## API Rate Limits
 
 FoxESS Cloud allows 1,440 API calls per day. This integration polls every 5 minutes, making 2 API calls per poll (device detail + real-time data), plus scheduler calls for battery-equipped devices (~576-864 calls/day), well within limits.

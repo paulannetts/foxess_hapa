@@ -248,17 +248,8 @@ class FoxessHapaNumber(FoxessHapaEntity, NumberEntity):
                 raise HomeAssistantError(msg)
 
             # Update only the current period, preserving the other extraParam
-            # values on it, and leave every other period untouched. All fields
-            # go in the one write so they cannot end up half-applied.
-            groups = [
-                {
-                    **client.minimal_group(g),
-                    "extraParam": {**g.get("extraParam", {}), **new_params},
-                }
-                if i == current_idx
-                else client.minimal_group(g)
-                for i, g in enumerate(groups)
-            ]
+            # values on it, and leave every other period untouched.
+            groups = client.update_group(groups, current_idx, extra_param=new_params)
 
         success = await client.async_set_scheduler(groups, enable=True, pad=False)
         if not success:
