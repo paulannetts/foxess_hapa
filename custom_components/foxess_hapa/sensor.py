@@ -648,8 +648,8 @@ def _format_schedule_period(idx: int, group: dict[str, Any]) -> dict[str, Any]:
         "work_mode": group.get("workMode", "SelfUse"),
         "min_soc": extra.get("minSocOnGrid"),
         "max_soc": extra.get("maxSoc"),
-        "charge_to_soc": extra.get("fdSoc"),
-        "charge_power": extra.get("fdPwr"),
+        "fd_soc": extra.get("fdSoc"),
+        "fd_pwr": extra.get("fdPwr"),
     }
     return period
 

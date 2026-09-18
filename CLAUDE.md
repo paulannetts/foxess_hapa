@@ -57,7 +57,7 @@ The integration follows standard Home Assistant patterns:
 - **Platform files**:
   - `sensor.py` - 45 sensors (power, energy, temperature, status)
   - `binary_sensor.py` - 4 binary sensors (battery state, grid export)
-  - `number.py` - Min SoC setting (10-100%)
+  - `number.py` - Target SoC (writes `minSocOnGrid` + `fdSoc` together) and Force Charge/Discharge Power
   - `select.py` - Work mode control (SelfUse, ForceCharge, etc.)
 
 ### Data Flow
