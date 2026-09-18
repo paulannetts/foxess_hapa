@@ -55,19 +55,14 @@ _SETTABLE_FIELDS = (
     "fd_pwr",
 )
 
-# Services act on one inverter, picked as a device (or one of its entities).
-# Area/floor/label targets are deliberately not offered: they could resolve to
-# several inverters and the handlers refuse to fan a schedule write out.
-_TARGET_FIELDS = {
-    key: validator
-    for key, validator in cv.TARGET_SERVICE_FIELDS.items()
-    if key in ("device_id", "entity_id")
-}
-
+# Services act on one inverter, picked as a device, one of its entities, or an
+# area/label containing exactly one. The target UI offers all of these, so the
+# schema accepts them all and _resolve_entry() refuses anything that resolves
+# to zero or several inverters rather than fanning a schedule write out.
 # `config_entry_id` predates device targeting and is kept so existing
-# automations keep working; new calls should use `target: device_id:`.
+# automations keep working; new calls should use `target:`.
 _ENTRY_FIELDS = {
-    **_TARGET_FIELDS,
+    **cv.TARGET_SERVICE_FIELDS,
     vol.Optional("config_entry_id"): cv.string,
 }
 
@@ -284,10 +279,11 @@ async def _resolve_entry(call: ServiceCall, data: dict) -> tuple[Any, Any]:
     """
     Find the one FoxESS config entry a service call is aimed at.
 
-    Prefers the service target (device or entity); `config_entry_id` is the
-    pre-target way of naming the device and still honoured. Exactly one
-    inverter must be targeted -- these services rewrite its schedule, and
-    fanning that out across several devices is never what an automation wants.
+    Prefers the service target (device, entity, area or label);
+    `config_entry_id` is the pre-target way of naming the device and still
+    honoured. Exactly one inverter must be targeted -- these services rewrite
+    its schedule, and fanning that out across several devices is never what an
+    automation wants.
     """
     if "config_entry_id" in data:
         LOGGER.warning(
@@ -311,7 +307,7 @@ async def _resolve_entry(call: ServiceCall, data: dict) -> tuple[Any, Any]:
     if len(matches) > 1:
         msg = (
             f"{len(matches)} FoxESS devices targeted; these services act on "
-            "one device at a time"
+            "one device at a time, so target a single device or entity"
         )
         raise ServiceValidationError(msg)
     return _get_client_and_coordinator(call.hass, matches[0].entry_id)

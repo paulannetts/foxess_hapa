@@ -2,7 +2,7 @@ set_schedule:
   name: Set Schedule
   description: Replace the full battery charge schedule with a new set of time periods.
   target:
-    device:
+    entity:
       integration: foxess_hapa
   fields:
     config_entry_id:
@@ -40,7 +40,7 @@ set_slot:
   name: Set Slot
   description: Update a single schedule slot by index, preserving all other slots.
   target:
-    device:
+    entity:
       integration: foxess_hapa
   fields:
     config_entry_id:
@@ -159,7 +159,7 @@ set_current_period:
     single scheduler write. Use this to change work mode and SoC target
     together without a moment where only one has taken effect.
   target:
-    device:
+    entity:
       integration: foxess_hapa
   fields:
     config_entry_id:

@@ -13,8 +13,8 @@ All notable changes to this project are documented here. The format follows
   automation can switch work mode and move the SoC target together.
 - `target_soc` argument on `set_schedule` periods, `set_slot` and
   `set_current_period`: sets `min_soc` and `fd_soc` to the same value.
-- Services target the inverter as a device (`target: device_id:` or one of
-  its entities) like other Home Assistant services.
+- Services target the inverter (`target: device_id:`, one of its entities,
+  or an area containing exactly one) like other Home Assistant services.
 
 ### Deprecated
 
