@@ -518,6 +518,34 @@ class FoxessHapaApiClient:
             result["extraParam"] = group["extraParam"]
         return result
 
+    @classmethod
+    def update_group(
+        cls,
+        groups: list[dict[str, Any]],
+        index: int,
+        *,
+        fields: dict[str, Any] | None = None,
+        extra_param: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Build a full group list with one group changed, ready for a partial write.
+
+        Every group is reduced to its minimal form so untouched slots go back
+        exactly as the device holds them; `groups[index]` additionally gets
+        `fields` (workMode, start/end times, enable) merged on top and
+        `extra_param` merged into its existing extraParam. All changes land in
+        the one write, so they cannot end up half-applied.
+        """
+        result = [cls.minimal_group(g) for g in groups]
+        target = {**result[index], **(fields or {})}
+        if extra_param:
+            target["extraParam"] = {
+                **groups[index].get("extraParam", {}),
+                **extra_param,
+            }
+        result[index] = target
+        return result
+
     @staticmethod
     def group_window(group: dict[str, Any]) -> tuple[int, int]:
         """Return a group's (start, end) as minutes past midnight."""

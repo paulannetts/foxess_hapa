@@ -54,6 +54,8 @@ The integration follows standard Home Assistant patterns:
 
 - **`const.py`**: Constants including `DOMAIN`, config keys, and logger.
 
+- **`services.py`** / **`services.yaml`**: `set_schedule`, `set_slot` and `set_current_period` services. Device-targeted; each applies all given fields in one scheduler write. `target_soc` expands to `min_soc` + `fd_soc`.
+
 - **Platform files**:
   - `sensor.py` - 45 sensors (power, energy, temperature, status)
   - `binary_sensor.py` - 4 binary sensors (battery state, grid export)

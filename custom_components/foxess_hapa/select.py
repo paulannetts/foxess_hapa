@@ -123,12 +123,9 @@ class FoxessHapaSelect(FoxessHapaEntity, SelectEntity):
                     return
 
                 # Update only the current period, preserve others
-                groups = [
-                    {**client.minimal_group(g), "workMode": option}
-                    if i == current_idx
-                    else client.minimal_group(g)
-                    for i, g in enumerate(groups)
-                ]
+                groups = client.update_group(
+                    groups, current_idx, fields={"workMode": option}
+                )
 
             success = await client.async_set_scheduler(groups, enable=True, pad=False)
 

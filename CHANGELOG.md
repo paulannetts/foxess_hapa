@@ -7,6 +7,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `foxess_hapa.set_current_period` service: applies any of `work_mode`,
+  `target_soc`, `min_soc`, `max_soc`, `fd_soc`, `fd_pwr` to the schedule
+  period covering the current time in a single scheduler write, so an
+  automation can switch work mode and move the SoC target together.
+- `target_soc` argument on `set_schedule` periods, `set_slot` and
+  `set_current_period`: sets `min_soc` and `fd_soc` to the same value.
+- Services target the inverter (`target: device_id:`, one of its entities,
+  or an area containing exactly one) like other Home Assistant services.
+
+### Deprecated
+
+- The `config_entry_id` service argument. It still works but logs a warning;
+  pick the device under "Targets" instead.
+
 - `number.<device>_target_soc` ("Target SoC"): sets `minSocOnGrid` and `fdSoc`
   together, in one scheduler write, on the schedule period covering the current
   time. One value that the battery charges up to in ForceCharge and does not
