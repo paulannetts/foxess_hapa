@@ -91,7 +91,7 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
                 "endHour": 23,
                 "endMinute": 30,
                 "workMode": "SelfUse",
-                "extraParam": {"minSocOnGrid": 20},
+                "extraParam": {"minSocOnGrid": 20, "fdSoc": 20},
             },
             {
                 "enable": 1,
@@ -304,6 +304,7 @@ class MockFoxessHapaApiClient(FoxessHapaApiClient):
         periods: list[dict[str, Any]],
         *,
         enable: bool = True,
+        pad: bool = True,  # noqa: ARG002 -- accepted for interface parity
     ) -> bool:
         """Mock setting scheduler (stores all provided periods)."""
         LOGGER.info(

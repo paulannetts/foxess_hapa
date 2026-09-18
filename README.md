@@ -75,7 +75,13 @@ A Home Assistant custom component for FoxESS inverters using the FoxESS Cloud AP
 ### Controls
 
 - **Work Mode** (Select): SelfUse, ForceCharge, ForceDischarge, Backup, FeedInFirst
-- **Min SoC on Grid** (Number): 10-100%
+- **Target SoC** (Number): 10-100%. Sets `minSocOnGrid` and `fdSoc` together on
+  the current schedule slot in one API call: the floor for SelfUse/ForceDischarge
+  and the charge target for ForceCharge.
+- **Force Charge/Discharge Power** (Number): range reported by the device
+
+Controls act on the schedule period covering the current time. See
+[CHANGELOG.md](CHANGELOG.md) for entity and attribute renames between releases.
 
 ## API Rate Limits
 
@@ -93,6 +99,10 @@ scripts/develop
 # Lint and format code
 scripts/lint
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
