@@ -29,6 +29,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Breaking:** requires Home Assistant 2026.3.0 or newer (was 2025.2.4), as the
+  integration now targets Python 3.14, which HA uses from 2026.3.0.
+
 - **Breaking:** the Schedule sensor's per-period attributes `charge_to_soc` and
   `charge_power` are renamed `fd_soc` and `fd_pwr`, matching the
   `set_schedule`/`set_slot` service arguments.
