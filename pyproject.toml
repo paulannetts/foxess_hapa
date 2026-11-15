@@ -11,10 +11,10 @@ version = "0.1.0"
 description = "Home Assistant custom component integration"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13.2"
+requires-python = ">=3.14.2"
 dependencies = [
     "colorlog==6.12.0",
-    "homeassistant==2025.12.5",
+    "homeassistant==2026.11.1",
     "go2rtc-client>=0.4.0",
 ]
 
@@ -26,7 +26,7 @@ dev = [
 
 [tool.ruff]
 # The contents of this file is based on https://github.com/home-assistant/core/blob/dev/pyproject.toml
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [

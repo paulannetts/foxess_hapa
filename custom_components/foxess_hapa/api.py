@@ -11,7 +11,6 @@ from datetime import datetime
 from typing import Any
 
 import aiohttp
-import async_timeout
 
 from .const import LOGGER
 
@@ -229,7 +228,7 @@ class FoxessHapaApiClient:
         url = f"{self.BASE_URL}{path}"
 
         try:
-            async with async_timeout.timeout(75):
+            async with asyncio.timeout(75):
                 LOGGER.debug("API Request %s %s", method, url)
                 if method == "GET":
                     response = await self._session.get(url, headers=headers)
@@ -323,7 +322,7 @@ class FoxessHapaApiClient:
             val = variables.get(key, default)
             try:
                 return int(val) if val is not None else default
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return default
 
         def safe_str(key: str, default: str = "") -> str:

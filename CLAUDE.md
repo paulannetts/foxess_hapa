@@ -23,7 +23,7 @@ The `scripts/develop` command starts Home Assistant with the custom component lo
 
 ## Linting
 
-Uses Ruff for linting and formatting (Python 3.13 target):
+Uses Ruff for linting and formatting (Python 3.14 target):
 - `ruff format .` - Format code
 - `ruff check . --fix` - Lint with auto-fix
 - Configuration in `pyproject.toml` under `[tool.ruff]` - uses `ALL` rules with specific ignores
