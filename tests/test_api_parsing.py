@@ -108,17 +108,31 @@ def test_real_time_non_numeric_float_falls_back(value: Any) -> None:
     assert data.battery_soc == 76.0  # the rest of the reading still parses
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="#102: an empty result list is left as a list and .get() is called on it",
+@pytest.mark.parametrize(
+    ("response", "match"),
+    [
+        ({"errno": 0, "result": []}, "No real-time data returned for device SN123"),
+        ({"errno": 0}, "Unexpected real-time data format: NoneType"),
+        ({"errno": 0, "result": None}, "Unexpected real-time data format"),
+        ({"errno": 0, "result": ["oops"]}, "Unexpected real-time data format: str"),
+        ({"errno": 0, "result": "oops"}, "Unexpected real-time data format: str"),
+    ],
 )
-def test_real_time_empty_result() -> None:
-    """An empty result should give an all-default reading, not a crash."""
-    client, _ = _client({"errno": 0, "result": []})
-    data = asyncio.run(client.async_get_real_time_data())
-    assert data.pv_power == 0.0
-    assert data.raw_variables == {}
+def test_real_time_empty_or_malformed_result_raises(
+    response: dict[str, Any], match: str
+) -> None:
+    """An empty or malformed result is an API error, not a reading of zeros."""
+    client, _ = _client(response)
+    with pytest.raises(api.FoxessHapaApiClientError, match=match):
+        asyncio.run(client.async_get_real_time_data())
+
+
+def test_real_time_result_as_single_object() -> None:
+    """A result that is already one device object is still accepted."""
+    client, _ = _client(
+        {"errno": 0, "result": {"datas": [{"variable": "SoC", "value": 55}]}}
+    )
+    assert asyncio.run(client.async_get_real_time_data()).battery_soc == 55.0
 
 
 def test_real_time_requests_this_device() -> None:

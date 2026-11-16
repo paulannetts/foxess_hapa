@@ -302,10 +302,19 @@ class FoxessHapaApiClient:
         path = "/op/v1/device/real/query"
         result = await self._api_request("POST", path, data={"sns": [self._device_sn]})
 
-        # Parse the result - it returns a list of variables
-        data = result.get("result", [])
-        if isinstance(data, list) and len(data) > 0:
+        # The result is a list with one entry per requested device. An empty or
+        # malformed result is an API failure, not a reading of zeros: raising
+        # lets the coordinator mark the update failed, whereas zeros would look
+        # like a reset to the total-increasing energy sensors.
+        data = result.get("result")
+        if isinstance(data, list):
+            if not data:
+                msg = f"No real-time data returned for device {self._device_sn}"
+                raise FoxessHapaApiClientError(msg)
             data = data[0]  # First device in response
+        if not isinstance(data, dict):
+            msg = f"Unexpected real-time data format: {type(data).__name__}"
+            raise FoxessHapaApiClientError(msg)
 
         variables = {}
         for var in data.get("datas", []):

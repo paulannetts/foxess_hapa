@@ -54,6 +54,9 @@ All notable changes to this project are documented here. The format follows
 - A non-numeric value from the FoxESS API for any decimal reading (e.g. `"n/a"`)
   failed the whole real-time update, leaving every sensor unavailable for that
   poll. That reading now falls back to 0 and the rest update normally (#101).
+- An empty or malformed real-time response from the FoxESS API crashed the
+  update with an `AttributeError`. It is now reported as a failed update with a
+  clear message (e.g. "No real-time data returned for device ...") (#102).
 
 ## [0.1.0]
 
