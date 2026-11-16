@@ -35,7 +35,7 @@ Uses Ruff for linting and formatting (Python 3.14 target):
 
 Tests live in `tests/` and run with pytest (`scripts/test`). They cover the scheduler helpers and request signing in `api.py`, parsing of real-time API responses, and the service input handling in `services.py`, without starting Home Assistant. Two `xfail(strict=True)` tests record known gaps in real-time parsing; when one is fixed, its test starts passing and must have the marker removed.
 
-CI runs Ruff, pytest, hassfest and HACS validation on PRs to main.
+CI runs Ruff, pytest, hassfest and HACS validation on PRs to main. The Ruff and pytest jobs install with `uv sync --locked`, so they use exactly the versions in `uv.lock` and fail if it is out of date with `pyproject.toml` (run `uv lock` to fix).
 
 ## Architecture
 
