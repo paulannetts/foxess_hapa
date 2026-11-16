@@ -95,21 +95,23 @@ def test_real_time_non_numeric_int_falls_back() -> None:
     assert data.current_fault_count == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="safe_float has no error handling, unlike safe_int",
-)
-def test_real_time_non_numeric_float_falls_back() -> None:
-    """A non-numeric value for a float field should fall back to the default."""
-    data = _real_time([{"variable": "pvPower", "value": "n/a"}])
+@pytest.mark.parametrize("value", ["n/a", "--", "", [1]])
+def test_real_time_non_numeric_float_falls_back(value: Any) -> None:
+    """A non-numeric float value falls back to the default, not a failed update."""
+    data = _real_time(
+        [
+            {"variable": "pvPower", "value": value},
+            {"variable": "SoC", "value": 76},
+        ]
+    )
     assert data.pv_power == 0.0
+    assert data.battery_soc == 76.0  # the rest of the reading still parses
 
 
 @pytest.mark.xfail(
     strict=True,
     raises=AttributeError,
-    reason="an empty result list is left as a list and .get() is called on it",
+    reason="#102: an empty result list is left as a list and .get() is called on it",
 )
 def test_real_time_empty_result() -> None:
     """An empty result should give an all-default reading, not a crash."""
