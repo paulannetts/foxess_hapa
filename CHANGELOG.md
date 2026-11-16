@@ -51,6 +51,9 @@ All notable changes to this project are documented here. The format follows
 
 - The mock API client (`FOXESS_MOCK_API=1`) rejected every entity write with a
   `TypeError`, so work mode and number changes could not be exercised locally.
+- A non-numeric value from the FoxESS API for any decimal reading (e.g. `"n/a"`)
+  failed the whole real-time update, leaving every sensor unavailable for that
+  poll. That reading now falls back to 0 and the rest update normally (#101).
 
 ## [0.1.0]
 

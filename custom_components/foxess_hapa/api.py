@@ -316,13 +316,18 @@ class FoxessHapaApiClient:
         # Helper to safely convert values to float or int
         def safe_float(key: str, default: float = 0.0) -> float:
             val = variables.get(key, default)
-            return float(val) if val is not None else default
+            try:
+                return float(val) if val is not None else default
+            except ValueError, TypeError:
+                LOGGER.debug("Non-numeric value for %s: %r", key, val)
+                return default
 
         def safe_int(key: str, default: int = 0) -> int:
             val = variables.get(key, default)
             try:
                 return int(val) if val is not None else default
             except ValueError, TypeError:
+                LOGGER.debug("Non-integer value for %s: %r", key, val)
                 return default
 
         def safe_str(key: str, default: str = "") -> str:
