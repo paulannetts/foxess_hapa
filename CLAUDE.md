@@ -17,6 +17,9 @@ scripts/develop
 
 # Lint and format code
 scripts/lint
+
+# Run the tests (extra args go to pytest)
+scripts/test
 ```
 
 The `scripts/develop` command starts Home Assistant with the custom component loaded via PYTHONPATH, using the `config/` directory for HA configuration.
@@ -28,7 +31,11 @@ Uses Ruff for linting and formatting (Python 3.14 target):
 - `ruff check . --fix` - Lint with auto-fix
 - Configuration in `pyproject.toml` under `[tool.ruff]` - uses `ALL` rules with specific ignores
 
-CI runs both hassfest and HACS validation on PRs to main.
+## Testing
+
+Tests live in `tests/` and run with pytest (`scripts/test`). They cover the scheduler helpers and request signing in `api.py`, parsing of real-time API responses, and the service input handling in `services.py`, without starting Home Assistant. Two `xfail(strict=True)` tests record known gaps in real-time parsing; when one is fixed, its test starts passing and must have the marker removed.
+
+CI runs Ruff, pytest, hassfest and HACS validation on PRs to main.
 
 ## Architecture
 
