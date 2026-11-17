@@ -68,6 +68,26 @@ def test_battery_power_is_charge_minus_discharge() -> None:
     assert discharging.battery_power == -1.2
 
 
+def test_residual_energy_is_already_kwh() -> None:
+    """
+    ResidualEnergy is passed through as kWh despite its "0.01kWh" unit label.
+
+    Values from a real 10.36 kWh battery are around 9.5, so dividing by 100
+    would report under 0.1 kWh. See issue #103.
+    """
+    data = _real_time(
+        [
+            {
+                "unit": "0.01kWh",
+                "name": "Battery Residual Energy",
+                "variable": "ResidualEnergy",
+                "value": 9.54,
+            }
+        ]
+    )
+    assert data.residual_energy == 9.54
+
+
 def test_real_time_missing_and_null_values_use_defaults() -> None:
     """Variables that are absent or null fall back to 0 / empty string."""
     data = _real_time(
