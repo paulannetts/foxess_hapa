@@ -343,9 +343,6 @@ class FoxessHapaApiClient:
             val = variables.get(key, default)
             return str(val) if val is not None else default
 
-        # Residual energy is reported in 0.01kWh units, convert to kWh
-        residual_energy_raw = safe_float("ResidualEnergy", 0)
-
         return FoxessRealTimeData(
             # Main power metrics
             pv_power=safe_float("pvPower"),
@@ -402,7 +399,10 @@ class FoxessHapaApiClient:
             meter_power_2=safe_float("meterPower2"),
             # Energy totals (kWh)
             generation_total=safe_float("generation"),
-            residual_energy=residual_energy_raw,
+            # The API labels ResidualEnergy's unit "0.01kWh", but the value
+            # is already in kWh (e.g. 9.54 on a 10.36 kWh battery), so it is
+            # used as is.
+            residual_energy=safe_float("ResidualEnergy"),
             energy_throughput=safe_float("energyThroughput"),
             grid_consumption_total=safe_float("gridConsumption"),
             loads_total=safe_float("loads"),
