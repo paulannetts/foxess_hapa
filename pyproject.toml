@@ -21,7 +21,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pip>=21.3.1",
-    "pytest==9.2.0",
+    # Pins pytest and homeassistant exactly; bump together with homeassistant
+    # (see the Dependabot "homeassistant" group).
+    "pytest-homeassistant==2026.11.1",
     "ruff==0.17.5",
 ]
 
@@ -65,3 +67,7 @@ max-complexity = 25
 [tool.pytest]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Let Home Assistant install its httpx alias before respx is imported.
+addopts = ["-p", "no:respx"]

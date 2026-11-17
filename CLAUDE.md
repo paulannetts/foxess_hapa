@@ -33,7 +33,11 @@ Uses Ruff for linting and formatting (Python 3.14 target):
 
 ## Testing
 
-Tests live in `tests/` and run with pytest (`scripts/test`). They cover the scheduler helpers and request signing in `api.py`, `_api_request` error handling and rate limiting (against a local aiohttp test server, not the real API), parsing of real-time API responses, and the service input handling in `services.py`, without starting Home Assistant. Known gaps can be recorded as `xfail(strict=True)` tests linking to their GitHub issue in the `reason`; when one is fixed, its test starts passing and must have the marker removed.
+Tests live in `tests/` and run with pytest (`scripts/test`). They cover the scheduler helpers and request signing in `api.py`, `_api_request` error handling and rate limiting (against a local aiohttp test server, not the real API), parsing of real-time API responses, and the service input handling in `services.py`, without starting Home Assistant.
+
+`test_config_flow.py`, `test_init.py`, `test_services.py` and `test_entities.py` run the integration inside a test Home Assistant instance (the `hass` fixture from [`pytest-homeassistant`](https://github.com/home-assistant/core/tree/dev/packages/pytest-homeassistant), the official successor to `pytest-homeassistant-custom-component`). The `loaded_entry` fixture in `conftest.py` sets up one inverter backed by `RecordingClient` (the `mock_api.py` fake, recording every `async_set_scheduler` call in `client.writes`) with the clock frozen at noon, so service and entity tests assert the exact `groups` payload written. `pytest-homeassistant` pins one exact `homeassistant` (and `pytest`) version; Dependabot bumps the two together in one PR. Its plugin blocks sockets, so tests needing a real local server use the `socket_enabled` fixture.
+
+Known gaps can be recorded as `xfail(strict=True)` tests linking to their GitHub issue in the `reason`; when one is fixed, its test starts passing and must have the marker removed.
 
 CI runs Ruff, pytest, hassfest and HACS validation on PRs to main. The Ruff and pytest jobs install with `uv sync --locked`, so they use exactly the versions in `uv.lock` and fail if it is out of date with `pyproject.toml` (run `uv lock` to fix).
 
