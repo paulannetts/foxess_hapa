@@ -15,3 +15,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      # pytest-homeassistant pins one exact homeassistant version, so bumping
+      # either alone fails to resolve. Always update them in the same PR.
+      homeassistant:
+        patterns:
+          - "homeassistant"
+          - "pytest-homeassistant"

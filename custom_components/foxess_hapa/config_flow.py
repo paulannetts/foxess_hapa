@@ -41,10 +41,10 @@ class FoxessHapaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             except FoxessHapaApiClientAuthenticationError as exception:
                 LOGGER.warning(exception)
-                _errors["base"] = "auth"
+                _errors["base"] = "invalid_auth"
             except FoxessHapaApiClientCommunicationError as exception:
                 LOGGER.error(exception)
-                _errors["base"] = "connection"
+                _errors["base"] = "cannot_connect"
             except FoxessHapaApiClientError as exception:
                 LOGGER.exception(exception)
                 _errors["base"] = "unknown"

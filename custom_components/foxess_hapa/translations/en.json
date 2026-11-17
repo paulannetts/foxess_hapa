@@ -10,8 +10,8 @@
             }
         },
         "error": {
-            "auth": "Device SN/API Key is wrong.",
-            "connection": "Unable to connect to the server.",
+            "invalid_auth": "Device SN/API Key is wrong.",
+            "cannot_connect": "Unable to connect to the server.",
             "unknown": "Unknown error occurred."
         },
         "abort": {

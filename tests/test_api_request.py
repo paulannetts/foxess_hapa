@@ -31,6 +31,10 @@ from custom_components.foxess_hapa.api import (
 DETAIL_PATH = "/op/v1/device/detail"
 REAL_PATH = "/op/v1/device/real/query"
 
+# The Home Assistant pytest plugin blocks sockets; these tests talk to a real
+# local server on purpose.
+pytestmark = pytest.mark.usefixtures("socket_enabled")
+
 
 @dataclass
 class Reply:
