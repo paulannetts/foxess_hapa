@@ -24,7 +24,7 @@ dev = [
     # Pins pytest and homeassistant exactly; bump together with homeassistant
     # (see the Dependabot "homeassistant" group).
     "pytest-homeassistant==2026.11.1",
-    "ruff==0.17.5",
+    "ruff==0.17.6",
 ]
 
 [tool.ruff]
